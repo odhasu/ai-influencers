@@ -1,0 +1,18 @@
+# Local environment files (never commit credentials)
+.env*
+!.env.example
+
+# Local tooling and deployment state
+.DS_Store
+.vercel/
+node_modules/
+.next/
+*.tsbuildinfo
+
+# Local photo-analysis source/output files not used by the website
+analyzing/
+analysis_output/
+generated_safe/
+generated_iphone18_realistic/
+photo_analysis.json
+.vercel

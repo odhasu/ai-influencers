@@ -1,0 +1,10 @@
+.env*
+!.env.example
+.git/
+.DS_Store
+node_modules/
+analyzing/
+analysis_output/
+generated_safe/
+generated_iphone18_realistic/
+photo_analysis.json
