@@ -1,4 +1,5 @@
 import { captureServerEvent } from "@/lib/posthog/server";
+import { getFunnelSettings } from "@/lib/funnel-settings";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -20,7 +21,7 @@ const answersSchema = z.object({
     "Bulk supplying to stores"
   ]),
   age_range: z.enum(["13 - 17", "18 - 23", "24 - 35", "35+"]),
-  instagram: z.string().trim().min(2).max(100),
+  instagram: z.string().trim().max(100).default(""),
   email: z.email().trim().max(254),
   full_name: z.string().trim().min(2).max(120),
   phone_number: z
@@ -35,10 +36,12 @@ const answersSchema = z.object({
     "$500 - $1K USD",
     "$1K - $3K USD",
     "$3K+ USD"
-  ])
+  ]),
+  call_commitment: z.literal("Yes")
 });
 
 const attributionSchema = z.object({
+  referral_code: z.string().trim().toLowerCase().max(80).default(""),
   utm_source: z.string().max(160).default(""),
   utm_medium: z.string().max(160).default(""),
   utm_campaign: z.string().max(160).default(""),
@@ -73,6 +76,30 @@ function decodedHeader(headers: Headers, name: string, maxLength = 160) {
   }
 }
 
+async function sendLeadWebhook(payload: Record<string, unknown>) {
+  const webhookUrl = process.env.LEAD_WEBHOOK_URL;
+  if (!webhookUrl) return;
+
+  try {
+    await fetch(webhookUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Funnel-Event": "waitlist_application_created"
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(5000)
+    });
+  } catch {
+    // Lead storage succeeds independently of optional notifications.
+  }
+}
+
+function normalizeInstagram(value: string) {
+  const trimmed = value.trim();
+  return trimmed && trimmed !== "not_provided" ? trimmed : "not_provided";
+}
+
 export async function POST(request: Request) {
   let parsed: z.infer<typeof requestSchema>;
 
@@ -91,16 +118,38 @@ export async function POST(request: Request) {
 
   const { answers, metadata } = parsed;
   const { attribution } = metadata;
+  const instagram = normalizeInstagram(answers.instagram);
 
   try {
     const supabase = createSupabaseAdmin();
+    const referralCode = attribution.referral_code
+      ? attribution.referral_code.replace(/[^a-z0-9-]/g, "").slice(0, 80)
+      : "";
+    const { data: referralLink } = referralCode
+      ? await supabase
+          .from("referral_links")
+          .select("id,code,utm_source,utm_medium,utm_campaign,utm_content,utm_term,is_active")
+          .eq("code", referralCode)
+          .maybeSingle()
+      : { data: null };
+    const activeReferralLink = referralLink?.is_active ? referralLink : null;
+    const resolvedAttribution = {
+      referral_code: referralCode || null,
+      referral_link_id: activeReferralLink?.id ?? null,
+      utm_source: attribution.utm_source || activeReferralLink?.utm_source || null,
+      utm_medium: attribution.utm_medium || activeReferralLink?.utm_medium || null,
+      utm_campaign: attribution.utm_campaign || activeReferralLink?.utm_campaign || null,
+      utm_content: attribution.utm_content || activeReferralLink?.utm_content || null,
+      utm_term: attribution.utm_term || activeReferralLink?.utm_term || null
+    };
+
     const { data, error } = await supabase
       .from("waitlist_applications")
       .upsert({
         reselling_experience: answers.reselling_experience,
         long_term_goal: answers.long_term_goal,
         age_range: answers.age_range,
-        instagram: answers.instagram,
+        instagram,
         email: answers.email.toLowerCase(),
         full_name: answers.full_name,
         phone_number: answers.phone_number,
@@ -109,11 +158,13 @@ export async function POST(request: Request) {
         posthog_distinct_id: metadata.posthog_distinct_id || null,
         form_duration_ms: metadata.form_duration_ms,
         analytics_consent: metadata.analytics_consent,
-        utm_source: attribution.utm_source || null,
-        utm_medium: attribution.utm_medium || null,
-        utm_campaign: attribution.utm_campaign || null,
-        utm_content: attribution.utm_content || null,
-        utm_term: attribution.utm_term || null,
+        referral_code: resolvedAttribution.referral_code,
+        referral_link_id: resolvedAttribution.referral_link_id,
+        utm_source: resolvedAttribution.utm_source,
+        utm_medium: resolvedAttribution.utm_medium,
+        utm_campaign: resolvedAttribution.utm_campaign,
+        utm_content: resolvedAttribution.utm_content,
+        utm_term: resolvedAttribution.utm_term,
         referrer: attribution.referrer || null,
         landing_path: attribution.landing_path || null,
         user_agent: safeHeader(request.headers, "user-agent", 500) || null,
@@ -143,13 +194,51 @@ export async function POST(request: Request) {
           lead_id: data.id,
           total_steps: 7,
           elapsed_ms: metadata.form_duration_ms,
-          utm_source: attribution.utm_source || null,
-          utm_medium: attribution.utm_medium || null,
-          utm_campaign: attribution.utm_campaign || null,
+          utm_source: resolvedAttribution.utm_source,
+          utm_medium: resolvedAttribution.utm_medium,
+          utm_campaign: resolvedAttribution.utm_campaign,
+          referral_code: resolvedAttribution.referral_code,
           source: "server"
         }
       });
     }
+
+    const settings = await getFunnelSettings(supabase);
+    const operationalTasks: Array<PromiseLike<unknown>> = [
+      supabase.from("funnel_events").insert({
+        event_name: "form_submit_succeeded",
+        session_id: metadata.session_id,
+        lead_id: data.id,
+        elapsed_ms: metadata.form_duration_ms,
+        utm_source: resolvedAttribution.utm_source,
+        utm_medium: resolvedAttribution.utm_medium,
+        utm_campaign: resolvedAttribution.utm_campaign,
+        referral_code: resolvedAttribution.referral_code,
+        referral_link_id: resolvedAttribution.referral_link_id,
+        landing_path: attribution.landing_path || null,
+        device_type: /mobile|iphone|android/i.test(safeHeader(request.headers, "user-agent", 500))
+          ? "mobile"
+          : "desktop",
+        metadata: { source: "server" }
+      })
+    ];
+
+    if (settings.webhookEnabled && process.env.LEAD_WEBHOOK_URL) {
+      operationalTasks.push(
+        sendLeadWebhook({
+          event: "waitlist_application_created",
+          lead_id: data.id,
+          created_at: new Date().toISOString(),
+          answers: { ...answers, instagram },
+          attribution: {
+            ...attribution,
+            ...resolvedAttribution
+          }
+        })
+      );
+    }
+
+    await Promise.allSettled(operationalTasks);
 
     return NextResponse.json({ ok: true, leadId: data.id });
   } catch (error) {

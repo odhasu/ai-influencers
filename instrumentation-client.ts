@@ -3,7 +3,11 @@ import posthog from "posthog-js";
 const token = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
 const host = process.env.NEXT_PUBLIC_POSTHOG_HOST;
 
-if (token && host && typeof window !== "undefined") {
+const isPrivateDashboard =
+  typeof window !== "undefined" &&
+  (window.location.pathname.startsWith("/dashboard") || window.location.pathname.startsWith("/admin"));
+
+if (token && host && typeof window !== "undefined" && !isPrivateDashboard) {
   const consent = window.localStorage.getItem("analytics_consent");
 
   posthog.init(token, {

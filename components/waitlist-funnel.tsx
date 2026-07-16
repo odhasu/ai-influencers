@@ -2,20 +2,20 @@
 
 import {
   ArrowLeft,
-  ArrowRight,
-  Check,
-  Play,
-  ShieldCheck,
-  X
+  ArrowRight
 } from "lucide-react";
 import posthog from "posthog-js";
+import { PhoneInput } from "react-international-phone";
 import {
+  CSSProperties,
   FormEvent,
   useEffect,
   useMemo,
   useRef,
   useState
 } from "react";
+import { CinematicCurtain } from "@/components/cinematic-curtain";
+import type { FunnelSettings } from "@/lib/funnel-settings";
 
 type AnswerKey =
   | "reselling_experience"
@@ -25,7 +25,8 @@ type AnswerKey =
   | "email"
   | "full_name"
   | "phone_number"
-  | "budget_range";
+  | "budget_range"
+  | "call_commitment";
 
 type Answers = Record<AnswerKey, string>;
 
@@ -49,7 +50,22 @@ type FunnelStep = {
   fields: ReadonlyArray<ChoiceField | TextField>;
 };
 
-type AnalyticsConsent = "granted" | "denied" | "unknown";
+type CaptureProperties = Record<string, string | number | boolean>;
+type CalendlyApi = {
+  initInlineWidget: (options: { url: string; parentElement: HTMLElement }) => void;
+};
+
+declare global {
+  interface Window {
+    Calendly?: CalendlyApi;
+  }
+}
+
+const calendlyUrl =
+  "https://calendly.com/ogvendorss/htr-call?hide_event_type_details=1&hide_gdpr_banner=1&background_color=ffffff&text_color=111111&primary_color=000000";
+
+const brandedHeroHeadline =
+  "See How Regular People Are Building $5K-$30K/Month High-Ticket Reselling Businesses";
 
 const steps: ReadonlyArray<FunnelStep> = [
   {
@@ -102,25 +118,13 @@ const steps: ReadonlyArray<FunnelStep> = [
     ]
   },
   {
-    key: "instagram",
-    title: "What's your Instagram @?",
-    fields: [
-      {
-        id: "instagram",
-        type: "text",
-        placeholder: "@yourusername",
-        autocomplete: "off"
-      }
-    ]
-  },
-  {
     key: "email",
     title: "Got it, and what's the best email to reach you at?",
     fields: [
       {
         id: "email",
         type: "email",
-        placeholder: "you@example.com",
+        placeholder: "your@email.com",
         autocomplete: "email"
       }
     ]
@@ -132,7 +136,7 @@ const steps: ReadonlyArray<FunnelStep> = [
       {
         id: "full_name",
         type: "text",
-        placeholder: "Full name",
+        placeholder: "Full Name",
         autocomplete: "name"
       },
       {
@@ -146,7 +150,7 @@ const steps: ReadonlyArray<FunnelStep> = [
   {
     key: "budget",
     title: "What budget range do you have for this?",
-    subtitle: "My program involves an upfront investment to help you scale to $5K-$30K+ per month.",
+    subtitle: "My program involves an upfront investment to help you scale to $5K–$30K+ per month.",
     fields: [
       {
         id: "budget_range",
@@ -157,6 +161,21 @@ const steps: ReadonlyArray<FunnelStep> = [
           ["C", "$500 - $1K USD"],
           ["D", "$1K - $3K USD"],
           ["E", "$3K+ USD"]
+        ]
+      }
+    ]
+  },
+  {
+    key: "call-commitment",
+    title: "Cool, just before I get you on a call to see if I can help you hit your goals...",
+    subtitle: "Can you make sure to choose a time slot that you can 100% commit to?",
+    fields: [
+      {
+        id: "call_commitment",
+        type: "button-group",
+        options: [
+          ["A", "Yes"],
+          ["B", "No"]
         ]
       }
     ]
@@ -171,21 +190,9 @@ const initialAnswers: Answers = {
   email: "",
   full_name: "",
   phone_number: "",
-  budget_range: ""
+  budget_range: "",
+  call_commitment: ""
 };
-
-const videos = [
-  ["IE0_sR4QfRg", "He makes $25,000/m selling unbranded glasses"],
-  ["-yUZ4U91dVQ", "He's Doing $20,000/Month With High Ticket Reselling"],
-  ["7xr2eSPviGM", "$0 to $30,000/Month in 6 Months"],
-  ["K4zdxmcqkcQ", "16 Year Old: $0 to $27K/Month"],
-  ["evjICkbXsig", "15 Year Old Hitting $22K/Month"],
-  ["uP7VTQFMmFY", "From Trampoline Park to $21K/Month"],
-  ["fX0Jrb7-bkI", "He Bought a C8 Corvette From Reselling"],
-  ["A8NgC6evgpA", "16 Year Old: $0 to $8K/Month"],
-  ["I80B0-LlEUk", "16 Year Old Made $70,000 With High Ticket Reselling"],
-  ["JsOt0YROtMk", "He's 15 and Makes $10,000/Month"]
-] as const;
 
 const winImages = [
   ["img_QRRPzkCGFMuT9xArHuNWR", 320, 325],
@@ -214,11 +221,59 @@ const winImages = [
   ["img_-VnkG34E9THKDzbJUaVAT", 320, 330]
 ] as const;
 
-function capture(event: string, properties: Record<string, string | number | boolean> = {}) {
-  if (!process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN) return;
+function storedAttributionProperties(): CaptureProperties {
+  if (typeof window === "undefined") return {};
 
   try {
-    posthog.capture(event, properties);
+    const attribution = JSON.parse(window.sessionStorage.getItem("waitlist_attribution") ?? "{}") as Record<
+      string,
+      unknown
+    >;
+    return {
+      ...(typeof attribution.utm_source === "string" && attribution.utm_source
+        ? { utm_source: attribution.utm_source }
+        : {}),
+      ...(typeof attribution.utm_medium === "string" && attribution.utm_medium
+        ? { utm_medium: attribution.utm_medium }
+        : {}),
+      ...(typeof attribution.utm_campaign === "string" && attribution.utm_campaign
+        ? { utm_campaign: attribution.utm_campaign }
+        : {}),
+      ...(typeof attribution.referral_code === "string" && attribution.referral_code
+        ? { referral_code: attribution.referral_code }
+        : {}),
+      ...(typeof attribution.landing_path === "string" && attribution.landing_path
+        ? { landing_path: attribution.landing_path }
+        : {})
+    };
+  } catch {
+    return {};
+  }
+}
+
+function capture(event: string, properties: CaptureProperties = {}) {
+  if (typeof window === "undefined" || !process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN) {
+    return;
+  }
+
+  const eventProperties = {
+    ...storedAttributionProperties(),
+    ...properties
+  };
+
+  void fetch("/api/funnel-events", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    keepalive: true,
+    body: JSON.stringify({
+      event,
+      session_id: getSessionId(),
+      properties: eventProperties
+    })
+  }).catch(() => undefined);
+
+  try {
+    posthog.capture(event, eventProperties);
   } catch {
     // Analytics must never interrupt the funnel.
   }
@@ -228,6 +283,7 @@ function validStep(stepIndex: number, answers: Answers) {
   return steps[stepIndex].fields.every((field) => {
     const value = answers[field.id].trim();
     if (!value) return false;
+    if (field.id === "call_commitment") return value === "Yes";
     if (field.type === "email") return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
     if (field.type === "tel") return value.replace(/\D/g, "").length >= 7;
     return true;
@@ -255,13 +311,11 @@ function getSessionId() {
   return created;
 }
 
-export function WaitlistFunnel() {
+export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
   const [answers, setAnswers] = useState<Answers>(initialAnswers);
   const [currentStep, setCurrentStep] = useState(0);
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [validationVisible, setValidationVisible] = useState(false);
-  const [activeVideo, setActiveVideo] = useState<string | null>(null);
-  const [analyticsConsent, setAnalyticsConsent] = useState<AnalyticsConsent>("unknown");
 
   const formRef = useRef<HTMLFormElement>(null);
   const honeypotRef = useRef<HTMLInputElement>(null);
@@ -273,6 +327,7 @@ export function WaitlistFunnel() {
   const formViewedRef = useRef(false);
   const attributionRef = useRef<Record<string, string>>({});
   const sessionIdRef = useRef("");
+  const calendlyRef = useRef<HTMLDivElement>(null);
 
   const step = steps[currentStep];
   const isReady = useMemo(() => validStep(currentStep, answers), [answers, currentStep]);
@@ -280,14 +335,19 @@ export function WaitlistFunnel() {
   useEffect(() => {
     const parameters = new URLSearchParams(window.location.search);
     attributionRef.current = {
+      referral_code: (parameters.get("ref") ?? parameters.get("referral_code") ?? "")
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "")
+        .slice(0, 80),
       utm_source: parameters.get("utm_source")?.slice(0, 160) ?? "",
       utm_medium: parameters.get("utm_medium")?.slice(0, 160) ?? "",
       utm_campaign: parameters.get("utm_campaign")?.slice(0, 160) ?? "",
       utm_content: parameters.get("utm_content")?.slice(0, 160) ?? "",
       utm_term: parameters.get("utm_term")?.slice(0, 160) ?? "",
       referrer: safeReferrer(),
-      landing_path: `${window.location.pathname}${window.location.hash}`.slice(0, 300)
+      landing_path: `${window.location.pathname}${window.location.search}${window.location.hash}`.slice(0, 300)
     };
+    window.sessionStorage.setItem("waitlist_attribution", JSON.stringify(attributionRef.current));
     sessionIdRef.current = getSessionId();
 
     return () => {
@@ -296,8 +356,41 @@ export function WaitlistFunnel() {
   }, []);
 
   useEffect(() => {
-    if (analyticsConsent !== "granted") return;
+    if (status !== "success" || !calendlyRef.current) return;
 
+    const parentElement = calendlyRef.current;
+    const initCalendly = () => {
+      if (!window.Calendly || parentElement.dataset.calendlyMounted === "true") return;
+      parentElement.dataset.calendlyMounted = "true";
+      parentElement.innerHTML = "";
+      window.Calendly.initInlineWidget({
+        url: calendlyUrl,
+        parentElement
+      });
+    };
+
+    if (window.Calendly) {
+      initCalendly();
+      return;
+    }
+
+    const existingScript = document.querySelector<HTMLScriptElement>("#calendly-widget-script");
+    if (existingScript) {
+      existingScript.addEventListener("load", initCalendly, { once: true });
+      return () => existingScript.removeEventListener("load", initCalendly);
+    }
+
+    const script = document.createElement("script");
+    script.id = "calendly-widget-script";
+    script.src = "https://assets.calendly.com/assets/external/widget.js";
+    script.async = true;
+    script.addEventListener("load", initCalendly, { once: true });
+    document.body.appendChild(script);
+
+    return () => script.removeEventListener("load", initCalendly);
+  }, [status]);
+
+  useEffect(() => {
     capture("landing_viewed", {
       landing_path: window.location.pathname,
       has_utm_source: Boolean(attributionRef.current.utm_source)
@@ -329,10 +422,10 @@ export function WaitlistFunnel() {
       window.removeEventListener("scroll", onScroll);
       timers.forEach((timer) => window.clearTimeout(timer));
     };
-  }, [analyticsConsent]);
+  }, []);
 
   useEffect(() => {
-    if (analyticsConsent !== "granted" || status === "success") return;
+    if (status === "success") return;
     if (viewedStepsRef.current.has(currentStep)) return;
 
     viewedStepsRef.current.add(currentStep);
@@ -341,10 +434,10 @@ export function WaitlistFunnel() {
       step_key: step.key,
       total_steps: steps.length
     });
-  }, [analyticsConsent, currentStep, status, step.key]);
+  }, [currentStep, status, step.key]);
 
   useEffect(() => {
-    if (analyticsConsent !== "granted" || !formRef.current || formViewedRef.current) return;
+    if (!formRef.current || formViewedRef.current) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -358,22 +451,7 @@ export function WaitlistFunnel() {
 
     observer.observe(formRef.current);
     return () => observer.disconnect();
-  }, [analyticsConsent]);
-
-  useEffect(() => {
-    if (!activeVideo) return;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setActiveVideo(null);
-    };
-
-    document.addEventListener("keydown", onKeyDown);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = "";
-    };
-  }, [activeVideo]);
+  }, []);
 
   function markFormStarted() {
     // eslint-disable-next-line react-hooks/purity -- This function runs only from user event handlers.
@@ -404,7 +482,12 @@ export function WaitlistFunnel() {
     setAnswers(nextAnswers);
 
     if (choiceTimerRef.current) window.clearTimeout(choiceTimerRef.current);
-    choiceTimerRef.current = window.setTimeout(() => advance(nextAnswers), 240);
+    if (currentStep === steps.length - 1) return;
+
+    choiceTimerRef.current = window.setTimeout(
+      () => advance(nextAnswers),
+      settings.autoAdvanceDelayMs
+    );
   }
 
   function updateAnswer(fieldId: AnswerKey, value: string) {
@@ -471,11 +554,11 @@ export function WaitlistFunnel() {
           metadata: {
             session_id: sessionIdRef.current,
             posthog_distinct_id:
-              analyticsConsent === "granted" && process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN
+              process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN
                 ? posthog.get_distinct_id()
                 : "",
             form_duration_ms: duration,
-            analytics_consent: analyticsConsent === "granted",
+            analytics_consent: Boolean(process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN),
             attribution: attributionRef.current
           }
         })
@@ -486,7 +569,7 @@ export function WaitlistFunnel() {
         throw new Error(result.message || "The application could not be saved.");
       }
 
-      if (analyticsConsent === "granted" && result.leadId && process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN) {
+      if (result.leadId && process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN) {
         posthog.identify(result.leadId);
         capture("form_success_shown", { lead_id: result.leadId });
       }
@@ -511,27 +594,31 @@ export function WaitlistFunnel() {
     document.querySelector("#waitlist")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  function openVideo(videoId: string, position: number) {
-    capture("testimonial_video_opened", { video_id: videoId, video_position: position });
-    setActiveVideo(videoId);
-  }
-
   return (
     <>
-      <div className="curtain" aria-hidden="true" />
+      <CinematicCurtain />
 
-      <main>
+      <main style={{ "--green": settings.accentColor } as CSSProperties}>
         <section className="hero" aria-labelledby="hero-title">
-          <h1 id="hero-title" className="gradient-title main-title">
-            The Inner Circle Is Currently Closed
+          <h1 id="hero-title" className="main-title">
+            {settings.heroHeadline === brandedHeroHeadline ? (
+              <>
+                <span className="hero-title-line">See How Regular People Are</span>
+                <span className="hero-title-line">
+                  Building <strong className="hero-title-accent">$5K-$30K/Month</strong>
+                </span>
+                <span className="hero-title-line hero-title-muted">High-</span>
+                <span className="hero-title-line hero-title-muted">Ticket Reselling Businesses</span>
+              </>
+            ) : (
+              settings.heroHeadline
+            )}
           </h1>
-          <p className="hero-copy">
-            We&apos;re not accepting new applications right now, but join the waitlist below to be first in line when spots open up.
-          </p>
-          <h2 className="gradient-title waitlist-title">Join the Waitlist</h2>
+          <p className="hero-copy">{settings.heroBody}</p>
+          <h2 className="gradient-title waitlist-title">{settings.waitlistHeading}</h2>
         </section>
 
-        <section id="waitlist" className="form-section" aria-label="Join the waitlist">
+        <section id="waitlist" className="form-section" aria-label="Apply now">
           <form className="waitlist-card" ref={formRef} onSubmit={handleSubmit} noValidate>
             <input
               ref={honeypotRef}
@@ -544,12 +631,21 @@ export function WaitlistFunnel() {
             />
 
             <div className="step-area" aria-live="polite" data-private>
-              {status === "success" ? (
-                <div className="success-panel">
-                  <span className="success-icon" aria-hidden="true">
-                    <Check size={30} strokeWidth={2.4} />
-                  </span>
-                  <h3>Your spot has been secured!</h3>
+              {!settings.formEnabled ? (
+                <div className="success-panel paused-panel">
+                  <h3>Applications are temporarily paused.</h3>
+                  <p>Check back soon for the next opening.</p>
+                </div>
+              ) : status === "success" ? (
+                <div className="booking-panel">
+                  <div className="booking-copy">
+                    <span className="step-number">8</span>
+                    <h3>Application received. Choose your call time.</h3>
+                    <p>Pick a slot you can 100% commit to.</p>
+                  </div>
+                  <div className="calendly-card" ref={calendlyRef}>
+                    <div className="calendly-loading">Loading calendar...</div>
+                  </div>
                 </div>
               ) : (
                 <div className="step-content" key={step.key}>
@@ -578,27 +674,48 @@ export function WaitlistFunnel() {
                         );
                       }
 
+                      if (field.id === "phone_number") {
+                        return (
+                          <PhoneInput
+                            className="phone-field"
+                            key={field.id}
+                            defaultCountry="us"
+                            forceDialCode
+                            value={answers[field.id]}
+                            disabled={status === "submitting"}
+                            inputProps={{
+                              "aria-label": "Phone number",
+                              autoComplete: field.autocomplete
+                            }}
+                            onChange={(phone) => updateAnswer(field.id, phone)}
+                          />
+                        );
+                      }
+
                       return (
-                        <input
-                          className="text-field"
-                          key={field.id}
-                          id={field.id}
-                          name={field.id}
-                          type={field.type}
-                          value={answers[field.id]}
-                          placeholder={field.placeholder}
-                          autoComplete={field.autocomplete}
-                          disabled={status === "submitting"}
-                          required
-                          onChange={(event) => updateAnswer(field.id, event.target.value)}
-                        />
+                        <div className="optional-field" key={field.id}>
+                          <input
+                            className="text-field"
+                            id={field.id}
+                            name={field.id}
+                            type={field.type}
+                            value={answers[field.id]}
+                            placeholder={field.placeholder}
+                            autoComplete={field.autocomplete}
+                            disabled={status === "submitting"}
+                            required
+                            onChange={(event) => updateAnswer(field.id, event.target.value)}
+                          />
+                        </div>
                       );
                     })}
                   </div>
 
                   {validationVisible ? (
                     <p className="form-message validation-message" role="alert">
-                      Complete this step before continuing.
+                      {step.key === "call-commitment"
+                        ? "Only continue if you can 100% commit to the call time."
+                        : "Complete this step before continuing."}
                     </p>
                   ) : null}
 
@@ -611,7 +728,7 @@ export function WaitlistFunnel() {
               )}
             </div>
 
-            {status !== "success" ? (
+            {settings.formEnabled && status !== "success" ? (
               <>
                 <div className="form-nav">
                   <button
@@ -634,7 +751,7 @@ export function WaitlistFunnel() {
                         : currentStep === steps.length - 1
                           ? status === "error"
                             ? "Try Again"
-                            : "Submit"
+                            : "OK"
                           : "OK"}
                     </span>
                     <ArrowRight size={19} aria-hidden="true" />
@@ -648,145 +765,53 @@ export function WaitlistFunnel() {
                 </div>
               </>
             ) : null}
-
-            <div className="form-security">
-              <ShieldCheck size={15} aria-hidden="true" />
-              <span>Secure application</span>
-            </div>
           </form>
         </section>
 
-        <section className="interviews" aria-labelledby="interviews-title">
-          <h2 id="interviews-title">Interviews with the Inner Circle:</h2>
-          <div className="video-grid">
-            {videos.map(([id, title], index) => (
-              <button
-                className="video-card"
-                type="button"
-                key={id}
-                aria-label={`Play testimonial: ${title}`}
-                onClick={() => openVideo(id, index + 1)}
-              >
-                <span className="video-thumb">
-                  {/* YouTube thumbnails are intentionally rendered directly to preserve the source framing. */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`https://i.ytimg.com/vi/${id}/hqdefault.jpg`} alt="" decoding="async" />
-                  <span className="play-icon" aria-hidden="true">
-                    <Play size={22} fill="currentColor" />
-                  </span>
+        {settings.showWins ? (
+          <section className="wins" aria-labelledby="wins-title">
+            <h2 id="wins-title">More Inner Circle Wins:</h2>
+            <div className="wins-masonry">
+              {winImages.map(([id, width, height], index) => (
+                <span className="win-image" key={`${id}-${index}`}>
+                  <picture>
+                    <source
+                      type="image/avif"
+                      srcSet={[320, 640, 960, 1280, 1920]
+                        .map((size) => `https://cdn.clyro.io/images/variants/${id}/${size}.avif ${size}w`)
+                        .join(", ")}
+                      sizes="(max-width: 768px) 50vw, 25vw"
+                    />
+                    <source
+                      type="image/webp"
+                      srcSet={[320, 640, 960, 1280, 1920]
+                        .map((size) => `https://cdn.clyro.io/images/variants/${id}/${size}.webp ${size}w`)
+                        .join(", ")}
+                      sizes="(max-width: 768px) 50vw, 25vw"
+                    />
+                    <img
+                      src={`https://cdn.clyro.io/images/variants/${id}/640.webp`}
+                      width={width}
+                      height={height}
+                      alt={`Inner Circle result ${index + 1}`}
+                      loading="lazy"
+                      decoding="async"
+                      fetchPriority="low"
+                    />
+                  </picture>
                 </span>
-                <span>
-                  <span className="video-title">{title}</span>
-                  <span className="video-source">Inner Circle Member</span>
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <div className="button-wrap">
-          <button className="cta-button" type="button" onClick={() => scrollToForm("mid_page")}>
-            Get Started Now
-          </button>
-        </div>
-
-        <section className="wins" aria-labelledby="wins-title">
-          <h2 id="wins-title">More Inner Circle Wins:</h2>
-          <div className="wins-masonry">
-            {winImages.map(([id, width, height], index) => (
-              <span className="win-image" key={`${id}-${index}`}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`https://cdn.clyro.io/images/variants/${id}/640.avif`}
-                  width={width}
-                  height={height}
-                  alt={`Inner Circle result ${index + 1}`}
-                  loading="lazy"
-                  decoding="async"
-                />
-              </span>
-            ))}
-          </div>
-        </section>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <div className="button-wrap final-cta">
           <button className="cta-button" type="button" onClick={() => scrollToForm("page_end")}>
-            Get Started Now
+            {settings.ctaLabel}
           </button>
         </div>
       </main>
 
-      {activeVideo ? (
-        <div className="video-modal open" role="presentation" onMouseDown={(event) => {
-          if (event.currentTarget === event.target) setActiveVideo(null);
-        }}>
-          <button className="modal-close" type="button" aria-label="Close video" onClick={() => setActiveVideo(null)}>
-            <X size={28} aria-hidden="true" />
-          </button>
-          <div className="modal-frame" role="dialog" aria-modal="true" aria-label="Testimonial video">
-            <iframe
-              title="Testimonial video"
-              src={`https://www.youtube.com/embed/${activeVideo}?autoplay=1&rel=0`}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-            />
-          </div>
-        </div>
-      ) : null}
-
-      <ConsentBanner consent={analyticsConsent} onChange={setAnalyticsConsent} />
     </>
-  );
-}
-
-function ConsentBanner({
-  consent,
-  onChange
-}: {
-  consent: AnalyticsConsent;
-  onChange: (value: AnalyticsConsent) => void;
-}) {
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem("analytics_consent");
-    const resolved: AnalyticsConsent = stored === "granted" || stored === "denied" ? stored : "unknown";
-    onChange(resolved);
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- This avoids a server/client localStorage mismatch.
-    setReady(true);
-  }, [onChange]);
-
-  function choose(value: Exclude<AnalyticsConsent, "unknown">) {
-    window.localStorage.setItem("analytics_consent", value);
-    onChange(value);
-
-    if (process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN) {
-      if (value === "granted") {
-        posthog.opt_in_capturing();
-        capture("analytics_consent_granted");
-      } else {
-        posthog.opt_out_capturing();
-      }
-    }
-  }
-
-  if (!ready || consent !== "unknown") return null;
-
-  return (
-    <aside className="consent-banner" aria-label="Analytics preferences">
-      <div className="consent-copy">
-        <ShieldCheck size={20} aria-hidden="true" />
-        <p>Allow privacy-safe analytics and masked session replay to help improve this funnel.</p>
-      </div>
-      <div className="consent-actions">
-        <button className="consent-button secondary" type="button" onClick={() => choose("denied")}>
-          Decline
-        </button>
-        <button className="consent-button primary" type="button" onClick={() => choose("granted")}>
-          Allow analytics
-          <Check size={15} aria-hidden="true" />
-        </button>
-      </div>
-    </aside>
   );
 }
