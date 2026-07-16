@@ -600,21 +600,37 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
 
       <main style={{ "--green": settings.accentColor } as CSSProperties}>
         <section className="hero" aria-labelledby="hero-title">
-          <h1 id="hero-title" className="main-title">
+          <h1
+            id="hero-title"
+            className={`main-title${settings.heroHeadline === brandedHeroHeadline ? " branded-main-title" : ""}`}
+          >
             {settings.heroHeadline === brandedHeroHeadline ? (
               <>
-                <span className="hero-title-line">See How Regular People Are</span>
-                <span className="hero-title-line">
-                  Building <strong className="hero-title-accent">$5K-$30K/Month</strong>
+                <span className="hero-title-line hero-title-lead">
+                  See How Regular<span className="mobile-title-break"><br /></span> People Are
                 </span>
-                <span className="hero-title-line hero-title-muted">High-</span>
-                <span className="hero-title-line hero-title-muted">Ticket Reselling Businesses</span>
+                <span className="hero-title-line hero-title-accent">
+                  Building<span className="mobile-title-break"><br /></span> $5K-$30K/Month
+                </span>
+                <span className="hero-title-line hero-title-close">
+                  High-Ticket<span className="mobile-title-break"><br /></span> Reselling
+                  <span className="mobile-title-break"><br /></span> Businesses
+                </span>
               </>
             ) : (
               settings.heroHeadline
             )}
           </h1>
-          <p className="hero-copy">{settings.heroBody}</p>
+          <p className="hero-copy">
+            {settings.heroBody === "The Exact System 200+ Members Use to Flip Authentic Products for Profit" ? (
+              <>
+                The Exact System 200+ Members Use to
+                <span className="mobile-title-break"><br /></span> Flip Authentic Products for Profit
+              </>
+            ) : (
+              settings.heroBody
+            )}
+          </p>
           <h2 className="gradient-title waitlist-title">{settings.waitlistHeading}</h2>
         </section>
 

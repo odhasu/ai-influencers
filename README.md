@@ -7,14 +7,13 @@ Last progress update: **July 16, 2026**
 ## Live project
 
 - Production domain: [authenticresell.com](https://authenticresell.com)
-- Alternate domain: [www.authenticresell.com](https://www.authenticresell.com)
 - Vercel fallback: [authentic-resell-application.vercel.app](https://authentic-resell-application.vercel.app)
 - Private GitHub repository: [odhasu/authentic-resell-application](https://github.com/odhasu/authentic-resell-application)
 - Vercel project: `authentic-resell-application`
 - Supabase: connected to the existing lead database
 - Production branch: `main`
 
-The custom domain and `www` subdomain are assigned to the new Vercel project. The old GitHub Pages website is no longer the intended production target.
+The apex custom domain is live on the new Vercel project. The `www` hostname is reserved in Vercel but still needs its DNS record configured at the domain registrar before it will resolve publicly. The old GitHub Pages website is no longer the intended production target.
 
 ## Current routes
 
@@ -33,9 +32,11 @@ The custom domain and `www` subdomain are assigned to the new Vercel project. Th
 
 The hero follows the visual direction from Authentic Resell:
 
-- Oversized white headline
-- Neon-green `$5K-$30K/Month` highlight
-- Muted-gray `High-Ticket Reselling Businesses` lines
+- Clean alternating white and neon-green headline lines
+- Neon-green `Building $5K-$30K/Month` emphasis
+- White `High-Ticket Reselling Businesses` closing line
+- Subtle green underline beneath the headline
+- Separate responsive line breaks for laptop and phone layouts
 - Supporting copy: `The Exact System 200+ Members Use to Flip Authentic Products for Profit`
 - Application heading: `Apply Now`
 - Brighter cinematic panel background with more visible texture, dividers, and depth
@@ -172,7 +173,7 @@ Completed:
 - New Vercel project
 - Preview and Production Supabase variables
 - Preview and Production dashboard authentication
-- Custom domain and `www` alias assignment
+- Custom apex-domain assignment
 - Brighter cinematic background
 
 Optional next improvements:
