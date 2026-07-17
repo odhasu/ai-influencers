@@ -110,12 +110,13 @@ These are optional for the current funnel and do not block lead collection or th
 - `lib/dashboard-data.ts` — dashboard database reads
 - `lib/funnel-settings.ts` — public funnel settings and defaults
 - `lib/admin-auth.ts` — dashboard session authentication
+- `lib/analytics/client.ts` — consented identity, attribution, and event collection
+- `ANALYTICS.md` — analytics event contract and privacy boundary
 - `supabase/migrations/` — versioned backend schema
 
 ## Removed from the funnel
 
 - Instagram application question
-- Analytics/session-replay consent sentence
 - `Secure application` row and icon
 - Visible `Interviews with the Inner Circle` video section
 - Redirect to the new thank-you flow

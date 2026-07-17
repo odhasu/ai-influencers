@@ -341,9 +341,11 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
 
     window.addEventListener("message", onMessage);
     window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("beforeunload", onPageHide);
     return () => {
       window.removeEventListener("message", onMessage);
       window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("beforeunload", onPageHide);
     };
   }, []);
 

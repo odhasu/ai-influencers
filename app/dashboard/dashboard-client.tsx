@@ -281,7 +281,7 @@ export function DashboardClient({
       vslStarts,
       vslCompletions,
       averageEngagedMs,
-      conversion: visits ? (submissions / visits) * 100 : 0,
+      conversion: visits ? Math.min(100, (submissions / visits) * 100) : 0,
       startRate: visits ? (starts / visits) * 100 : 0,
       bookingRate: submissions ? (bookings / submissions) * 100 : 0,
       vslCompletionRate: vslStarts ? (vslCompletions / vslStarts) * 100 : 0,
