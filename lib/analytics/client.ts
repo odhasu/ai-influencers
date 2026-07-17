@@ -351,6 +351,9 @@ export function captureFunnelEvent(event: string, properties: AnalyticsPropertie
 
   try {
     posthog.capture(event, eventProperties);
+    if (event === "page_viewed") {
+      posthog.capture("$pageview", eventProperties);
+    }
   } catch {
     // Analytics must never interrupt the public funnel.
   }

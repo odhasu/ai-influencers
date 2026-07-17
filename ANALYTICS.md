@@ -25,6 +25,8 @@ Acquisition and engagement:
 - `button_clicked`
 - `primary_cta_clicked`
 
+PostHog also receives its standard `$pageview` event when `page_viewed` is captured. This keeps PostHog's built-in landing-page, geography, browser, device, and session reports compatible without enabling DOM autocapture.
+
 Application:
 
 - `form_viewed`
