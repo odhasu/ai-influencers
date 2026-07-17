@@ -26,6 +26,7 @@ The apex custom domain is live on the new Vercel project. The `www` hostname is 
 | `/waitlist-thank-you` | Legacy thank-you page kept for possible future use |
 | `/api/waitlist` | Validated lead-submission endpoint |
 | `/api/funnel-events` | Funnel and referral event endpoint |
+| `/api/webhooks/calendly` | Signed Calendly booking webhook and owner SMS notification |
 | `/api/admin/*` | Authenticated dashboard APIs |
 
 ## Current public experience
@@ -97,6 +98,7 @@ Not currently configured:
 
 - PostHog environment variables
 - `LEAD_WEBHOOK_URL`
+- Calendly/Twilio booking SMS variables (see `.env.example`)
 
 These are optional for the current funnel and do not block lead collection or the dashboard.
 
@@ -179,6 +181,6 @@ Completed:
 Optional next improvements:
 
 - Add PostHog project variables and dashboards
-- Add email/SMS lead notifications through a webhook
+- Configure the Calendly booking webhook and Twilio SMS credentials
 - Replace the current dashboard password with a stronger credential when desired
 - Add automated end-to-end form tests
