@@ -1,6 +1,6 @@
 import { verifyCalendlyWebhook } from "@/lib/calendly/webhook";
+import { sendBookingEmail } from "@/lib/gmail/booking-email";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
-import { sendSms } from "@/lib/twilio/sms";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -19,14 +19,12 @@ const webhookSchema = z.object({
   })
 });
 
-function bookingMessage(payload: z.infer<typeof webhookSchema>["payload"]) {
-  const start = new Intl.DateTimeFormat("en-GB", {
+function formattedBookingTime(startTime: string) {
+  return new Intl.DateTimeFormat("en-GB", {
     dateStyle: "medium",
     timeStyle: "short",
     timeZone: process.env.BOOKING_NOTIFICATION_TIMEZONE || "Europe/Amsterdam"
-  }).format(new Date(payload.scheduled_event.start_time));
-
-  return `New Calendly booking: ${payload.name} (${payload.email}) booked ${payload.scheduled_event.name} for ${start}.`;
+  }).format(new Date(startTime));
 }
 
 export async function POST(request: Request) {
@@ -55,15 +53,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, ignored: true });
   }
 
-  const notificationNumber = process.env.BOOKING_NOTIFICATION_PHONE;
-  if (!notificationNumber) {
-    return NextResponse.json({ ok: false, message: "Notification phone is not configured." }, { status: 503 });
-  }
-
   const supabase = createSupabaseAdmin();
   const eventUri = parsed.data.payload.uri;
   const { data: claimed, error: claimError } = await supabase
-    .from("booking_sms_notifications")
+    .from("booking_email_notifications")
     .insert({ calendly_event_uri: eventUri, invitee_email: parsed.data.payload.email.toLowerCase() })
     .select("id")
     .single();
@@ -81,14 +74,16 @@ export async function POST(request: Request) {
       .eq("email", normalizedEmail)
       .maybeSingle();
 
-    const twilioMessageSid = await sendSms({
-      to: notificationNumber,
-      body: bookingMessage(parsed.data.payload)
+    const gmailMessageId = await sendBookingEmail({
+      guestName: parsed.data.payload.name,
+      guestEmail: parsed.data.payload.email,
+      eventName: parsed.data.payload.scheduled_event.name,
+      startsAt: formattedBookingTime(parsed.data.payload.scheduled_event.start_time)
     });
 
     await supabase
-      .from("booking_sms_notifications")
-      .update({ lead_id: lead?.id ?? null, twilio_message_sid: twilioMessageSid, sent_at: new Date().toISOString() })
+      .from("booking_email_notifications")
+      .update({ lead_id: lead?.id ?? null, gmail_message_id: gmailMessageId, sent_at: new Date().toISOString() })
       .eq("id", claimed.id);
 
     if (lead && lead.lead_status !== "won") {
@@ -97,10 +92,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    await supabase.from("booking_sms_notifications").delete().eq("id", claimed.id);
-    console.error("calendly_booking_sms_failed", {
+    await supabase.from("booking_email_notifications").delete().eq("id", claimed.id);
+    console.error("calendly_booking_email_failed", {
       message: error instanceof Error ? error.message : "Unknown error"
     });
-    return NextResponse.json({ ok: false, message: "SMS could not be sent." }, { status: 503 });
+    return NextResponse.json({ ok: false, message: "Booking email could not be sent." }, { status: 503 });
   }
 }

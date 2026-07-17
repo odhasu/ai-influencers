@@ -14,6 +14,7 @@
     "hls.js": "^1.6.16",
     "lucide-react": "1.24.0",
     "next": "16.2.10",
+    "nodemailer": "^9.0.3",
     "posthog-js": "1.399.1",
     "posthog-node": "5.40.0",
     "react": "19.2.7",
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@types/node": "26.1.1",
+    "@types/nodemailer": "^7.0.12",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "eslint": "9.39.5",
