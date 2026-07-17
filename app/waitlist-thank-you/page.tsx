@@ -82,7 +82,14 @@ export default async function WaitlistThankYouPage() {
 
         {settings.bookingUrl ? (
           <div className="thank-you-booking">
-            <a className="cta-button" href={settings.bookingUrl} rel="noreferrer">
+            <a
+              className="cta-button"
+              href={settings.bookingUrl}
+              rel="noreferrer"
+              data-analytics-event="booking_started"
+              data-analytics-label={settings.bookingCtaLabel}
+              data-analytics-location="thank_you_page"
+            >
               {settings.bookingCtaLabel}
             </a>
           </div>

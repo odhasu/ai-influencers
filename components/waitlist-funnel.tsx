@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   ArrowRight
 } from "lucide-react";
-import posthog from "posthog-js";
 import { PhoneInput } from "react-international-phone";
 import {
   CSSProperties,
@@ -15,6 +14,12 @@ import {
   useState
 } from "react";
 import { CinematicCurtain } from "@/components/cinematic-curtain";
+import {
+  captureFunnelEvent,
+  getPosthogDistinctId,
+  getSubmissionAnalytics,
+  identifyAnalyticsLead
+} from "@/lib/analytics/client";
 import type { FunnelSettings } from "@/lib/funnel-settings";
 
 type AnswerKey =
@@ -50,7 +55,6 @@ type FunnelStep = {
   fields: ReadonlyArray<ChoiceField | TextField>;
 };
 
-type CaptureProperties = Record<string, string | number | boolean>;
 type CalendlyApi = {
   initInlineWidget: (options: { url: string; parentElement: HTMLElement }) => void;
 };
@@ -221,64 +225,6 @@ const winImages = [
   ["img_-VnkG34E9THKDzbJUaVAT", 320, 330]
 ] as const;
 
-function storedAttributionProperties(): CaptureProperties {
-  if (typeof window === "undefined") return {};
-
-  try {
-    const attribution = JSON.parse(window.sessionStorage.getItem("waitlist_attribution") ?? "{}") as Record<
-      string,
-      unknown
-    >;
-    return {
-      ...(typeof attribution.utm_source === "string" && attribution.utm_source
-        ? { utm_source: attribution.utm_source }
-        : {}),
-      ...(typeof attribution.utm_medium === "string" && attribution.utm_medium
-        ? { utm_medium: attribution.utm_medium }
-        : {}),
-      ...(typeof attribution.utm_campaign === "string" && attribution.utm_campaign
-        ? { utm_campaign: attribution.utm_campaign }
-        : {}),
-      ...(typeof attribution.referral_code === "string" && attribution.referral_code
-        ? { referral_code: attribution.referral_code }
-        : {}),
-      ...(typeof attribution.landing_path === "string" && attribution.landing_path
-        ? { landing_path: attribution.landing_path }
-        : {})
-    };
-  } catch {
-    return {};
-  }
-}
-
-function capture(event: string, properties: CaptureProperties = {}) {
-  if (typeof window === "undefined" || !process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN) {
-    return;
-  }
-
-  const eventProperties = {
-    ...storedAttributionProperties(),
-    ...properties
-  };
-
-  void fetch("/api/funnel-events", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    keepalive: true,
-    body: JSON.stringify({
-      event,
-      session_id: getSessionId(),
-      properties: eventProperties
-    })
-  }).catch(() => undefined);
-
-  try {
-    posthog.capture(event, eventProperties);
-  } catch {
-    // Analytics must never interrupt the funnel.
-  }
-}
-
 function validStep(stepIndex: number, answers: Answers) {
   return steps[stepIndex].fields.every((field) => {
     const value = answers[field.id].trim();
@@ -288,27 +234,6 @@ function validStep(stepIndex: number, answers: Answers) {
     if (field.type === "tel") return value.replace(/\D/g, "").length >= 7;
     return true;
   });
-}
-
-function safeReferrer() {
-  if (!document.referrer) return "";
-
-  try {
-    const url = new URL(document.referrer);
-    return `${url.origin}${url.pathname}`.slice(0, 300);
-  } catch {
-    return "";
-  }
-}
-
-function getSessionId() {
-  const key = "waitlist_session_id";
-  const existing = window.sessionStorage.getItem(key);
-  if (existing) return existing;
-
-  const created = window.crypto.randomUUID();
-  window.sessionStorage.setItem(key, created);
-  return created;
 }
 
 export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
@@ -325,31 +250,20 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
   const completedStepsRef = useRef(new Set<number>());
   const viewedStepsRef = useRef(new Set<number>());
   const formViewedRef = useRef(false);
-  const attributionRef = useRef<Record<string, string>>({});
-  const sessionIdRef = useRef("");
   const calendlyRef = useRef<HTMLDivElement>(null);
+  const fieldFocusRef = useRef(new Map<AnswerKey, number>());
+  const stepViewedAtRef = useRef(0);
+  const abandonmentTrackedRef = useRef(false);
+  const submittedRef = useRef(false);
+  const bookingStartedRef = useRef(false);
+  const bookingCompletedRef = useRef(false);
+  const leadIdRef = useRef("");
+  const currentStepRef = useRef(0);
 
   const step = steps[currentStep];
   const isReady = useMemo(() => validStep(currentStep, answers), [answers, currentStep]);
 
   useEffect(() => {
-    const parameters = new URLSearchParams(window.location.search);
-    attributionRef.current = {
-      referral_code: (parameters.get("ref") ?? parameters.get("referral_code") ?? "")
-        .toLowerCase()
-        .replace(/[^a-z0-9-]/g, "")
-        .slice(0, 80),
-      utm_source: parameters.get("utm_source")?.slice(0, 160) ?? "",
-      utm_medium: parameters.get("utm_medium")?.slice(0, 160) ?? "",
-      utm_campaign: parameters.get("utm_campaign")?.slice(0, 160) ?? "",
-      utm_content: parameters.get("utm_content")?.slice(0, 160) ?? "",
-      utm_term: parameters.get("utm_term")?.slice(0, 160) ?? "",
-      referrer: safeReferrer(),
-      landing_path: `${window.location.pathname}${window.location.search}${window.location.hash}`.slice(0, 300)
-    };
-    window.sessionStorage.setItem("waitlist_attribution", JSON.stringify(attributionRef.current));
-    sessionIdRef.current = getSessionId();
-
     return () => {
       if (choiceTimerRef.current) window.clearTimeout(choiceTimerRef.current);
     };
@@ -363,6 +277,13 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
       if (!window.Calendly || parentElement.dataset.calendlyMounted === "true") return;
       parentElement.dataset.calendlyMounted = "true";
       parentElement.innerHTML = "";
+      if (!bookingStartedRef.current) {
+        bookingStartedRef.current = true;
+        captureFunnelEvent("booking_started", {
+          provider: "calendly",
+          lead_id: leadIdRef.current || undefined
+        });
+      }
       window.Calendly.initInlineWidget({
         url: calendlyUrl,
         parentElement
@@ -391,45 +312,49 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
   }, [status]);
 
   useEffect(() => {
-    capture("landing_viewed", {
-      landing_path: window.location.pathname,
-      has_utm_source: Boolean(attributionRef.current.utm_source)
-    });
-
-    const reached = new Set<number>();
-    const milestones = [25, 50, 75, 90, 100];
-    const onScroll = () => {
-      const scrollable = document.documentElement.scrollHeight - window.innerHeight;
-      if (scrollable <= 0) return;
-      const percent = Math.min(100, Math.round((window.scrollY / scrollable) * 100));
-
-      for (const milestone of milestones) {
-        if (percent >= milestone && !reached.has(milestone)) {
-          reached.add(milestone);
-          capture("scroll_depth_reached", { percent: milestone });
-        }
+    const onMessage = (event: MessageEvent) => {
+      try {
+        const hostname = new URL(event.origin).hostname;
+        if (hostname !== "calendly.com" && !hostname.endsWith(".calendly.com")) return;
+      } catch {
+        return;
       }
+      if (event.data?.event !== "calendly.event_scheduled" || bookingCompletedRef.current) return;
+      bookingCompletedRef.current = true;
+      captureFunnelEvent("booking_completed", {
+        provider: "calendly",
+        lead_id: leadIdRef.current || undefined
+      });
     };
 
-    const timers = [15, 30, 60, 120].map((seconds) =>
-      window.setTimeout(() => capture("time_on_page_reached", { seconds }), seconds * 1000)
-    );
+    const onPageHide = () => {
+      if (!formStartedTrackedRef.current || submittedRef.current || abandonmentTrackedRef.current) return;
+      abandonmentTrackedRef.current = true;
+      captureFunnelEvent("form_abandoned", {
+        abandon_reason: "page_unloaded",
+        step_number: currentStepRef.current + 1,
+        step_key: steps[currentStepRef.current].key,
+        completed_steps: completedStepsRef.current.size,
+        elapsed_ms: formStartedAtRef.current ? Math.max(0, Date.now() - formStartedAtRef.current) : 0
+      });
+    };
 
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-
+    window.addEventListener("message", onMessage);
+    window.addEventListener("pagehide", onPageHide);
     return () => {
-      window.removeEventListener("scroll", onScroll);
-      timers.forEach((timer) => window.clearTimeout(timer));
+      window.removeEventListener("message", onMessage);
+      window.removeEventListener("pagehide", onPageHide);
     };
   }, []);
 
   useEffect(() => {
+    currentStepRef.current = currentStep;
     if (status === "success") return;
     if (viewedStepsRef.current.has(currentStep)) return;
 
     viewedStepsRef.current.add(currentStep);
-    capture("form_step_viewed", {
+    stepViewedAtRef.current = Date.now();
+    captureFunnelEvent("form_step_viewed", {
       step_number: currentStep + 1,
       step_key: step.key,
       total_steps: steps.length
@@ -443,7 +368,7 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
       ([entry]) => {
         if (!entry.isIntersecting || formViewedRef.current) return;
         formViewedRef.current = true;
-        capture("form_viewed", { total_steps: steps.length });
+        captureFunnelEvent("form_viewed", { total_steps: steps.length });
         observer.disconnect();
       },
       { threshold: 0.35 }
@@ -459,17 +384,48 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
     if (formStartedTrackedRef.current) return;
 
     formStartedTrackedRef.current = true;
-    capture("form_started", { total_steps: steps.length });
+    captureFunnelEvent("form_started", { total_steps: steps.length });
   }
 
   function trackStepCompleted(stepIndex: number) {
     if (completedStepsRef.current.has(stepIndex)) return;
 
     completedStepsRef.current.add(stepIndex);
-    capture("form_step_completed", {
+    captureFunnelEvent("form_step_completed", {
       step_number: stepIndex + 1,
       step_key: steps[stepIndex].key,
-      total_steps: steps.length
+      total_steps: steps.length,
+      // eslint-disable-next-line react-hooks/purity -- This function runs only from user event handlers.
+      step_elapsed_ms: stepViewedAtRef.current ? Math.max(0, Date.now() - stepViewedAtRef.current) : 0
+    });
+  }
+
+  function trackFieldFocused(fieldId: AnswerKey, fieldType: "text" | "email" | "tel") {
+    // eslint-disable-next-line react-hooks/purity -- This function runs only from input focus handlers.
+    fieldFocusRef.current.set(fieldId, Date.now());
+    captureFunnelEvent("form_field_focused", {
+      field_key: fieldId,
+      field_type: fieldType,
+      step_number: currentStep + 1,
+      step_key: step.key
+    });
+  }
+
+  function trackFieldCompleted(
+    fieldId: AnswerKey,
+    fieldType: "text" | "email" | "tel",
+    completed: boolean
+  ) {
+    const focusedAt = fieldFocusRef.current.get(fieldId);
+    fieldFocusRef.current.delete(fieldId);
+    captureFunnelEvent("form_field_completed", {
+      field_key: fieldId,
+      field_type: fieldType,
+      field_completed: completed,
+      // eslint-disable-next-line react-hooks/purity -- This function runs only from input blur handlers.
+      focus_duration_ms: focusedAt ? Math.max(0, Date.now() - focusedAt) : 0,
+      step_number: currentStep + 1,
+      step_key: step.key
     });
   }
 
@@ -480,6 +436,14 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
 
     const nextAnswers = { ...answers, [fieldId]: value };
     setAnswers(nextAnswers);
+    captureFunnelEvent("form_field_completed", {
+      field_key: fieldId,
+      field_type: "choice",
+      field_completed: true,
+      focus_duration_ms: 0,
+      step_number: currentStep + 1,
+      step_key: step.key
+    });
 
     if (choiceTimerRef.current) window.clearTimeout(choiceTimerRef.current);
     if (currentStep === steps.length - 1) return;
@@ -503,7 +467,7 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
 
     if (!validStep(currentStep, nextAnswers)) {
       setValidationVisible(true);
-      capture("form_validation_failed", {
+      captureFunnelEvent("form_validation_failed", {
         step_number: currentStep + 1,
         step_key: step.key
       });
@@ -523,7 +487,7 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
 
   function goBack() {
     if (status === "submitting" || currentStep === 0) return;
-    capture("form_back_clicked", {
+    captureFunnelEvent("form_back_clicked", {
       from_step_number: currentStep + 1,
       from_step_key: step.key
     });
@@ -536,7 +500,7 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
     // eslint-disable-next-line react-hooks/purity -- Submission is triggered by an event handler.
     const duration = formStartedAtRef.current ? Date.now() - formStartedAtRef.current : 0;
     setStatus("submitting");
-    capture("form_submit_started", {
+    captureFunnelEvent("form_submit_started", {
       total_steps: steps.length,
       elapsed_ms: duration
     });
@@ -552,14 +516,9 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
           answers: nextAnswers,
           website: honeypotRef.current?.value ?? "",
           metadata: {
-            session_id: sessionIdRef.current,
-            posthog_distinct_id:
-              process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN
-                ? posthog.get_distinct_id()
-                : "",
-            form_duration_ms: duration,
-            analytics_consent: Boolean(process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN),
-            attribution: attributionRef.current
+            ...getSubmissionAnalytics(),
+            posthog_distinct_id: getPosthogDistinctId(),
+            form_duration_ms: duration
           }
         })
       });
@@ -569,15 +528,17 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
         throw new Error(result.message || "The application could not be saved.");
       }
 
-      if (result.leadId && process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN) {
-        posthog.identify(result.leadId);
-        capture("form_success_shown", { lead_id: result.leadId });
+      if (result.leadId) {
+        leadIdRef.current = result.leadId;
+        submittedRef.current = true;
+        identifyAnalyticsLead(result.leadId);
+        captureFunnelEvent("form_success_shown", { lead_id: result.leadId });
       }
 
       setStatus("success");
     } catch (error) {
       setStatus("error");
-      capture("form_submit_failed", {
+      captureFunnelEvent("form_submit_failed", {
         total_steps: steps.length,
         failure_type: error instanceof TypeError ? "network" : "server"
       });
@@ -590,7 +551,10 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
   }
 
   function scrollToForm(location: string) {
-    capture("primary_cta_clicked", { cta_location: location });
+    captureFunnelEvent("primary_cta_clicked", {
+      cta_location: location,
+      button_label: settings.ctaLabel
+    });
     document.querySelector("#waitlist")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -691,7 +655,14 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
                             disabled={status === "submitting"}
                             inputProps={{
                               "aria-label": "Phone number",
-                              autoComplete: field.autocomplete
+                              autoComplete: field.autocomplete,
+                              onFocus: () => trackFieldFocused(field.id, "tel"),
+                              onBlur: () =>
+                                trackFieldCompleted(
+                                  field.id,
+                                  "tel",
+                                  answers[field.id].replace(/\D/g, "").length >= 7
+                                )
                             }}
                             onChange={(phone) => updateAnswer(field.id, phone)}
                           />
@@ -710,6 +681,10 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
                             autoComplete={field.autocomplete}
                             disabled={status === "submitting"}
                             required
+                            onFocus={() => trackFieldFocused(field.id, field.type)}
+                            onBlur={() =>
+                              trackFieldCompleted(field.id, field.type, Boolean(answers[field.id].trim()))
+                            }
                             onChange={(event) => updateAnswer(field.id, event.target.value)}
                           />
                         </div>

@@ -1154,6 +1154,72 @@ input:focus-visible {
   outline-offset: 3px;
 }
 
+.analytics-consent {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 100;
+  width: min(460px, calc(100vw - 36px));
+  padding: 16px;
+  border: 1px solid #303630;
+  border-radius: 8px;
+  background: #101310;
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.42);
+  color: #dfe5df;
+}
+
+.analytics-preference-button {
+  position: fixed;
+  left: 10px;
+  bottom: 10px;
+  z-index: 90;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid #303630;
+  border-radius: 6px;
+  background: #101310;
+  color: #8f9990;
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.analytics-consent p {
+  margin: 0;
+  color: #aeb8af;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.analytics-consent > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.analytics-consent button {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.consent-secondary {
+  border: 1px solid #394039;
+  background: transparent;
+  color: #c4ccc5;
+}
+
+.consent-primary {
+  border: 1px solid var(--green);
+  background: var(--green);
+  color: #061005;
+}
+
 @keyframes step-up {
   from {
     opacity: 0;
@@ -1178,6 +1244,17 @@ input:focus-visible {
 }
 
 @media (max-width: 640px) {
+  .analytics-consent {
+    right: 12px;
+    bottom: 12px;
+    width: calc(100vw - 24px);
+  }
+
+  .analytics-consent > div {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
   .success-panel h3 {
     font-size: 32px;
   }

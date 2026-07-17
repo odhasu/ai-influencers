@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { AnalyticsConsent } from "@/components/analytics-consent";
+import { AnalyticsPageTracker } from "@/components/analytics-page-tracker";
 import "react-international-phone/style.css";
 import "./globals.css";
 
@@ -10,7 +12,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <AnalyticsPageTracker />
+        <AnalyticsConsent />
+      </body>
     </html>
   );
 }

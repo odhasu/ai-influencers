@@ -31,22 +31,44 @@ export type DashboardLead = {
   country: string | null;
   city: string | null;
   form_duration_ms: number;
+  visitor_id: string | null;
+  session_number: number;
+  timezone: string | null;
+  referrer_domain: string | null;
+  gclid: string | null;
+  fbclid: string | null;
+  ttclid: string | null;
+  msclkid: string | null;
+  first_touch: Record<string, string>;
+  last_touch: Record<string, string>;
 };
 
 export type DashboardEvent = {
   created_at: string;
   event_name: string;
   session_id: string;
+  visitor_id: string | null;
+  pageview_id: string | null;
   lead_id: string | null;
   step_number: number | null;
   step_key: string | null;
   percent: number | null;
   cta_location: string | null;
+  video_id: string | null;
+  elapsed_ms: number | null;
   utm_source: string | null;
   utm_campaign: string | null;
   referral_code: string | null;
   referral_link_id: string | null;
   device_type: string | null;
+  browser: string | null;
+  os: string | null;
+  country: string | null;
+  city: string | null;
+  conversion_type: string | null;
+  value_cents: number | null;
+  currency: string | null;
+  metadata: Record<string, unknown>;
 };
 
 export type ReferralLink = {
@@ -93,14 +115,14 @@ export async function getDashboardPayload(): Promise<DashboardPayload> {
       supabase
         .from("waitlist_applications")
         .select(
-          "id,created_at,updated_at,full_name,email,phone_number,instagram,reselling_experience,long_term_goal,age_range,budget_range,lead_status,notes,follow_up_at,last_contacted_at,assigned_to,tags,referral_code,referral_link_id,utm_source,utm_medium,utm_campaign,country,city,form_duration_ms"
+          "id,created_at,updated_at,full_name,email,phone_number,instagram,reselling_experience,long_term_goal,age_range,budget_range,lead_status,notes,follow_up_at,last_contacted_at,assigned_to,tags,referral_code,referral_link_id,utm_source,utm_medium,utm_campaign,country,city,form_duration_ms,visitor_id,session_number,timezone,referrer_domain,gclid,fbclid,ttclid,msclkid,first_touch,last_touch"
         )
         .order("created_at", { ascending: false })
         .limit(1000),
       supabase
         .from("funnel_events")
         .select(
-          "created_at,event_name,session_id,lead_id,step_number,step_key,percent,cta_location,utm_source,utm_campaign,referral_code,referral_link_id,device_type"
+          "created_at,event_name,session_id,visitor_id,pageview_id,lead_id,step_number,step_key,percent,cta_location,video_id,elapsed_ms,utm_source,utm_campaign,referral_code,referral_link_id,device_type,browser,os,country,city,conversion_type,value_cents,currency,metadata"
         )
         .gte("created_at", eventsSince)
         .order("created_at", { ascending: false })
@@ -156,7 +178,17 @@ export async function getDashboardPayload(): Promise<DashboardPayload> {
               assigned_to: null,
               tags: [],
               referral_code: null,
-              referral_link_id: null
+              referral_link_id: null,
+              visitor_id: null,
+              session_number: 1,
+              timezone: null,
+              referrer_domain: null,
+              gclid: null,
+              fbclid: null,
+              ttclid: null,
+              msclkid: null,
+              first_touch: {},
+              last_touch: {}
             })) as DashboardLead[],
             error:
               "Existing leads are shown in read-only compatibility mode. Apply the dashboard migration to enable pipeline editing, analytics, and live funnel settings."

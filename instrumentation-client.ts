@@ -14,7 +14,7 @@ if (token && host && typeof window !== "undefined" && !isPrivateDashboard) {
     api_host: "/ingest",
     ui_host: host,
     defaults: "2026-05-30",
-    autocapture: true,
+    autocapture: false,
     capture_pageview: false,
     capture_pageleave: true,
     person_profiles: "identified_only",

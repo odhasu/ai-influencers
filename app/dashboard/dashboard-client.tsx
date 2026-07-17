@@ -4,9 +4,12 @@ import {
   ArrowUpRight,
   AtSign,
   BarChart3,
+  CalendarCheck,
   CheckCircle2,
   ChevronRight,
   Clipboard,
+  Clock3,
+  CircleDollarSign,
   Download,
   ExternalLink,
   Link2,
@@ -16,6 +19,8 @@ import {
   MousePointerClick,
   Phone,
   Plus,
+  PlayCircle,
+  RefreshCw,
   Save,
   Search,
   Settings2,
@@ -219,6 +224,25 @@ export function DashboardClient({
     const today = dayKey(new Date());
     const todayLeads = leads.filter((lead) => lead.created_at.slice(0, 10) === today).length;
     const highIntent = leads.filter((lead) => ["$1K - $3K USD", "$3K+ USD"].includes(lead.budget_range)).length;
+    const visitorEvents = initialPayload.events.filter((event) => event.event_name === "page_viewed");
+    const uniqueVisitors = new Set(visitorEvents.map((event) => event.visitor_id || event.session_id)).size;
+    const returningVisitors = new Set(
+      visitorEvents
+        .filter((event) => event.metadata.is_returning_visitor === true)
+        .map((event) => event.visitor_id || event.session_id)
+    ).size;
+    const bookings = sessions("booking_completed");
+    const payments = sessions("payment_succeeded");
+    const abandons = sessions("form_abandoned");
+    const vslStarts = sessions("vsl_started");
+    const vslCompletions = sessions("vsl_completed");
+    const engagementEvents = initialPayload.events.filter((event) => event.event_name === "page_engagement_recorded");
+    const averageEngagedMs = engagementEvents.length
+      ? engagementEvents.reduce((sum, event) => {
+          const value = event.metadata.engaged_ms;
+          return sum + (typeof value === "number" ? value : event.elapsed_ms ?? 0);
+        }, 0) / engagementEvents.length
+      : 0;
 
     const trend = Array.from({ length: 7 }, (_, offset) => {
       const date = new Date();
@@ -249,8 +273,25 @@ export function DashboardClient({
       submissions,
       todayLeads,
       highIntent,
+      uniqueVisitors,
+      returningVisitors,
+      bookings,
+      payments,
+      abandons,
+      vslStarts,
+      vslCompletions,
+      averageEngagedMs,
       conversion: visits ? (submissions / visits) * 100 : 0,
       startRate: visits ? (starts / visits) * 100 : 0,
+      bookingRate: submissions ? (bookings / submissions) * 100 : 0,
+      vslCompletionRate: vslStarts ? (vslCompletions / vslStarts) * 100 : 0,
+      funnelStages: [
+        ["Landing views", visits],
+        ["Form starts", starts],
+        ["Applications", submissions],
+        ["Bookings", bookings],
+        ["Won", leads.filter((lead) => lead.lead_status === "won").length]
+      ] as Array<[string, number]>,
       trend,
       byStatus,
       topSources: [...sources.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)
@@ -490,8 +531,19 @@ function OverviewTab({
     submissions: number;
     todayLeads: number;
     highIntent: number;
+    uniqueVisitors: number;
+    returningVisitors: number;
+    bookings: number;
+    payments: number;
+    abandons: number;
+    vslStarts: number;
+    vslCompletions: number;
+    averageEngagedMs: number;
     conversion: number;
     startRate: number;
+    bookingRate: number;
+    vslCompletionRate: number;
+    funnelStages: Array<[string, number]>;
     trend: Array<{ key: string; label: string; count: number }>;
     byStatus: Array<{ status: LeadStatus; count: number }>;
     topSources: Array<[string, number]>;
@@ -499,14 +551,20 @@ function OverviewTab({
 }) {
   const maxTrend = Math.max(1, ...analytics.trend.map((day) => day.count));
   const maxStatus = Math.max(1, ...analytics.byStatus.map((item) => item.count));
+  const maxFunnel = Math.max(1, ...analytics.funnelStages.map(([, count]) => count));
 
   return (
     <div className={styles.content}>
       <section className={styles.metricsGrid}>
         <MetricCard icon={Users} label="Total leads" value={String(leads.length)} detail={`${analytics.todayLeads} today`} />
-        <MetricCard icon={MousePointerClick} label="Landing views" value={String(analytics.visits)} detail="Last 30 days" />
+        <MetricCard icon={MousePointerClick} label="Unique visitors" value={String(analytics.uniqueVisitors)} detail={`${analytics.visits} landing views`} />
+        <MetricCard icon={RefreshCw} label="Returning visitors" value={String(analytics.returningVisitors)} detail="Consented visitors" />
         <MetricCard icon={Target} label="Form start rate" value={percentage(analytics.startRate)} detail={`${analytics.starts} starts`} />
         <MetricCard icon={CheckCircle2} label="Conversion rate" value={percentage(analytics.conversion)} detail={`${analytics.highIntent} high-intent leads`} />
+        <MetricCard icon={CalendarCheck} label="Booking rate" value={percentage(analytics.bookingRate)} detail={`${analytics.bookings} bookings`} />
+        <MetricCard icon={PlayCircle} label="VSL completion" value={percentage(analytics.vslCompletionRate)} detail={`${analytics.vslStarts} starts`} />
+        <MetricCard icon={Clock3} label="Average engagement" value={`${Math.round(analytics.averageEngagedMs / 1000)}s`} detail="Active page time" />
+        <MetricCard icon={CircleDollarSign} label="Payments" value={String(analytics.payments)} detail="Server-confirmed" />
       </section>
 
       <section className={styles.overviewGrid}>
@@ -535,6 +593,27 @@ function OverviewTab({
                 <div><i style={{ width: `${(item.count / maxStatus) * 100}%` }} /></div>
               </div>
             ))}
+          </div>
+        </article>
+
+        <article className={styles.panel}>
+          <div className={styles.panelHeader}><div><p>Funnel</p><h2>Stage conversion</h2></div></div>
+          <div className={styles.breakdownList}>
+            {analytics.funnelStages.map(([label, count]) => (
+              <div key={label}>
+                <span>{label} <strong>{count}</strong></span>
+                <div><i style={{ width: `${(count / maxFunnel) * 100}%` }} /></div>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className={styles.panel}>
+          <div className={styles.panelHeader}><div><p>Behavior</p><h2>Drop-off signals</h2></div></div>
+          <div className={styles.sourceList}>
+            <div><span>1</span><p>Form abandons</p><strong>{analytics.abandons}</strong></div>
+            <div><span>2</span><p>VSL starts</p><strong>{analytics.vslStarts}</strong></div>
+            <div><span>3</span><p>VSL completions</p><strong>{analytics.vslCompletions}</strong></div>
           </div>
         </article>
 
@@ -870,6 +949,10 @@ function LeadDrawer({
             <div><dt>Location</dt><dd>{[lead.city, lead.country].filter(Boolean).join(", ") || "Unknown"}</dd></div>
             <div><dt>Referral</dt><dd>{lead.referral_code || "None"}</dd></div>
             <div><dt>Source</dt><dd>{lead.utm_source || "Direct / unknown"}</dd></div>
+            <div><dt>Referrer</dt><dd>{lead.referrer_domain || "Direct / unknown"}</dd></div>
+            <div><dt>Visitor sessions</dt><dd>{lead.session_number}</dd></div>
+            <div><dt>Timezone</dt><dd>{lead.timezone || "Unknown"}</dd></div>
+            <div><dt>Ad click ID</dt><dd>{lead.gclid ? "Google" : lead.fbclid ? "Meta" : lead.ttclid ? "TikTok" : lead.msclkid ? "Microsoft" : "None"}</dd></div>
           </dl>
         </section>
 

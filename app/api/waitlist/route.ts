@@ -40,15 +40,32 @@ const answersSchema = z.object({
   call_commitment: z.literal("Yes")
 });
 
-const attributionSchema = z.object({
+const attributionTouchSchema = z.object({
+  captured_at: z.union([z.literal(""), z.iso.datetime()]),
+  landing_path: z.string().max(300),
+  referrer_domain: z.string().max(160),
+  referrer_path: z.string().max(300),
   referral_code: z.string().trim().toLowerCase().max(80).default(""),
   utm_source: z.string().max(160).default(""),
   utm_medium: z.string().max(160).default(""),
   utm_campaign: z.string().max(160).default(""),
   utm_content: z.string().max(160).default(""),
   utm_term: z.string().max(160).default(""),
-  referrer: z.string().max(300).default(""),
-  landing_path: z.string().max(300).default("")
+  gclid: z.string().max(300),
+  gbraid: z.string().max(300),
+  wbraid: z.string().max(300),
+  fbclid: z.string().max(300),
+  ttclid: z.string().max(300),
+  msclkid: z.string().max(300),
+  twclid: z.string().max(300),
+  li_fat_id: z.string().max(300),
+  sccid: z.string().max(300),
+  dclid: z.string().max(300)
+});
+
+const attributionSchema = z.object({
+  first_touch: attributionTouchSchema,
+  last_touch: attributionTouchSchema
 });
 
 const requestSchema = z.object({
@@ -56,6 +73,10 @@ const requestSchema = z.object({
   website: z.string().max(200).default(""),
   metadata: z.object({
     session_id: z.uuid(),
+    visitor_id: z.union([z.literal(""), z.uuid()]),
+    pageview_id: z.union([z.literal(""), z.uuid()]),
+    session_number: z.number().int().min(1).max(10000),
+    timezone: z.string().max(80),
     posthog_distinct_id: z.string().max(200).default(""),
     form_duration_ms: z.number().int().min(0).max(1000 * 60 * 60 * 8),
     analytics_consent: z.boolean(),
@@ -118,12 +139,13 @@ export async function POST(request: Request) {
 
   const { answers, metadata } = parsed;
   const { attribution } = metadata;
+  const { first_touch: firstTouch, last_touch: lastTouch } = attribution;
   const instagram = normalizeInstagram(answers.instagram);
 
   try {
     const supabase = createSupabaseAdmin();
-    const referralCode = attribution.referral_code
-      ? attribution.referral_code.replace(/[^a-z0-9-]/g, "").slice(0, 80)
+    const referralCode = lastTouch.referral_code
+      ? lastTouch.referral_code.replace(/[^a-z0-9-]/g, "").slice(0, 80)
       : "";
     const { data: referralLink } = referralCode
       ? await supabase
@@ -136,12 +158,27 @@ export async function POST(request: Request) {
     const resolvedAttribution = {
       referral_code: referralCode || null,
       referral_link_id: activeReferralLink?.id ?? null,
-      utm_source: attribution.utm_source || activeReferralLink?.utm_source || null,
-      utm_medium: attribution.utm_medium || activeReferralLink?.utm_medium || null,
-      utm_campaign: attribution.utm_campaign || activeReferralLink?.utm_campaign || null,
-      utm_content: attribution.utm_content || activeReferralLink?.utm_content || null,
-      utm_term: attribution.utm_term || activeReferralLink?.utm_term || null
+      utm_source: lastTouch.utm_source || activeReferralLink?.utm_source || null,
+      utm_medium: lastTouch.utm_medium || activeReferralLink?.utm_medium || null,
+      utm_campaign: lastTouch.utm_campaign || activeReferralLink?.utm_campaign || null,
+      utm_content: lastTouch.utm_content || activeReferralLink?.utm_content || null,
+      utm_term: lastTouch.utm_term || activeReferralLink?.utm_term || null
     };
+    const clickIds = Object.fromEntries(
+      ["gclid", "gbraid", "wbraid", "fbclid", "ttclid", "msclkid", "twclid", "li_fat_id", "sccid", "dclid"]
+        .map((key) => [key, lastTouch[key as keyof typeof lastTouch]])
+        .filter(([, value]) => value)
+    );
+    const normalizedEmail = answers.email.toLowerCase();
+    const { data: existingLead } = await supabase
+      .from("waitlist_applications")
+      .select("id,first_touch")
+      .eq("email", normalizedEmail)
+      .maybeSingle();
+    const preservedFirstTouch =
+      existingLead?.first_touch && Object.keys(existingLead.first_touch as Record<string, unknown>).length
+        ? existingLead.first_touch
+        : firstTouch;
 
     const { data, error } = await supabase
       .from("waitlist_applications")
@@ -150,11 +187,15 @@ export async function POST(request: Request) {
         long_term_goal: answers.long_term_goal,
         age_range: answers.age_range,
         instagram,
-        email: answers.email.toLowerCase(),
+        email: normalizedEmail,
         full_name: answers.full_name,
         phone_number: answers.phone_number,
         budget_range: answers.budget_range,
         session_id: metadata.session_id,
+        visitor_id: metadata.visitor_id || null,
+        pageview_id: metadata.pageview_id || null,
+        session_number: metadata.session_number,
+        timezone: metadata.timezone || null,
         posthog_distinct_id: metadata.posthog_distinct_id || null,
         form_duration_ms: metadata.form_duration_ms,
         analytics_consent: metadata.analytics_consent,
@@ -165,8 +206,16 @@ export async function POST(request: Request) {
         utm_campaign: resolvedAttribution.utm_campaign,
         utm_content: resolvedAttribution.utm_content,
         utm_term: resolvedAttribution.utm_term,
-        referrer: attribution.referrer || null,
-        landing_path: attribution.landing_path || null,
+        first_touch: preservedFirstTouch,
+        last_touch: lastTouch,
+        click_ids: clickIds,
+        referrer: [lastTouch.referrer_domain, lastTouch.referrer_path].filter(Boolean).join("") || null,
+        referrer_domain: lastTouch.referrer_domain || null,
+        landing_path: lastTouch.landing_path || null,
+        gclid: lastTouch.gclid || null,
+        fbclid: lastTouch.fbclid || null,
+        ttclid: lastTouch.ttclid || null,
+        msclkid: lastTouch.msclkid || null,
         user_agent: safeHeader(request.headers, "user-agent", 500) || null,
         country: safeHeader(request.headers, "x-vercel-ip-country", 8) || null,
         region: decodedHeader(request.headers, "x-vercel-ip-country-region", 80) || null,
@@ -198,6 +247,10 @@ export async function POST(request: Request) {
           utm_medium: resolvedAttribution.utm_medium,
           utm_campaign: resolvedAttribution.utm_campaign,
           referral_code: resolvedAttribution.referral_code,
+          visitor_id: metadata.visitor_id || null,
+          session_number: metadata.session_number,
+          first_touch_utm_source: firstTouch.utm_source || null,
+          last_touch_utm_source: resolvedAttribution.utm_source,
           source: "server"
         }
       });
@@ -207,7 +260,10 @@ export async function POST(request: Request) {
     const operationalTasks: Array<PromiseLike<unknown>> = [
       supabase.from("funnel_events").insert({
         event_name: "form_submit_succeeded",
+        event_client_at: new Date().toISOString(),
         session_id: metadata.session_id,
+        visitor_id: metadata.visitor_id || null,
+        pageview_id: metadata.pageview_id || null,
         lead_id: data.id,
         elapsed_ms: metadata.form_duration_ms,
         utm_source: resolvedAttribution.utm_source,
@@ -215,13 +271,34 @@ export async function POST(request: Request) {
         utm_campaign: resolvedAttribution.utm_campaign,
         referral_code: resolvedAttribution.referral_code,
         referral_link_id: resolvedAttribution.referral_link_id,
-        landing_path: attribution.landing_path || null,
+        utm_content: resolvedAttribution.utm_content,
+        utm_term: resolvedAttribution.utm_term,
+        landing_path: lastTouch.landing_path || null,
+        referrer_domain: lastTouch.referrer_domain || null,
+        timezone: metadata.timezone || null,
+        first_touch: preservedFirstTouch,
+        last_touch: lastTouch,
+        click_ids: clickIds,
         device_type: /mobile|iphone|android/i.test(safeHeader(request.headers, "user-agent", 500))
           ? "mobile"
           : "desktop",
-        metadata: { source: "server" }
+        metadata: { source: "server", session_number: metadata.session_number }
       })
     ];
+
+    if (metadata.visitor_id) {
+      operationalTasks.push(
+        supabase.from("lead_visitor_links").upsert(
+          {
+            lead_id: data.id,
+            visitor_id: metadata.visitor_id,
+            last_linked_at: new Date().toISOString(),
+            last_session_id: metadata.session_id
+          },
+          { onConflict: "lead_id,visitor_id" }
+        )
+      );
+    }
 
     if (settings.webhookEnabled && process.env.LEAD_WEBHOOK_URL) {
       operationalTasks.push(
@@ -231,7 +308,9 @@ export async function POST(request: Request) {
           created_at: new Date().toISOString(),
           answers: { ...answers, instagram },
           attribution: {
-            ...attribution,
+            first_touch: preservedFirstTouch,
+            last_touch: lastTouch,
+            click_ids: clickIds,
             ...resolvedAttribution
           }
         })
