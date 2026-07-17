@@ -621,16 +621,6 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
               settings.heroHeadline
             )}
           </h1>
-          <p className="hero-copy">
-            {settings.heroBody === "The Exact System 200+ Members Use to Flip Authentic Products for Profit" ? (
-              <>
-                The Exact System 200+ Members Use to
-                <span className="mobile-title-break"><br /></span> Flip Authentic Products for Profit
-              </>
-            ) : (
-              settings.heroBody
-            )}
-          </p>
           <h2 className="gradient-title waitlist-title">{settings.waitlistHeading}</h2>
         </section>
 

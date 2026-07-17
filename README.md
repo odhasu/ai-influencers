@@ -37,7 +37,6 @@ The hero follows the visual direction from Authentic Resell:
 - White `High-Ticket Reselling Businesses` closing line
 - Subtle green underline beneath the headline
 - Separate responsive line breaks for laptop and phone layouts
-- Supporting copy: `The Exact System 200+ Members Use to Flip Authentic Products for Profit`
 - Application heading: `Apply Now`
 - Brighter cinematic panel background with more visible texture, dividers, and depth
 

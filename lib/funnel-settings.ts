@@ -27,7 +27,7 @@ export const defaultFunnelSettings: FunnelSettings = {
   campaignName: "Inner Circle Waitlist",
   heroHeadline:
     "See How Regular People Are Building $5K-$30K/Month High-Ticket Reselling Businesses",
-  heroBody: "The Exact System 200+ Members Use to Flip Authentic Products for Profit",
+  heroBody: "",
   waitlistHeading: "Apply Now",
   ctaLabel: "Get Started Now",
   accentColor: "#39FF14",

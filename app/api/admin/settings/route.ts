@@ -14,7 +14,7 @@ const publicId = z.string().trim().max(120).regex(/^[A-Za-z0-9._-]*$/);
 const settingsSchema = z.object({
   campaignName: z.string().trim().min(2).max(120),
   heroHeadline: z.string().trim().min(4).max(180),
-  heroBody: z.string().trim().min(10).max(500),
+  heroBody: z.string().trim().max(500),
   waitlistHeading: z.string().trim().min(2).max(120),
   ctaLabel: z.string().trim().min(2).max(80),
   accentColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
