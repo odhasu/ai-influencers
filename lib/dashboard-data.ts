@@ -110,7 +110,6 @@ export async function getDashboardPayload(): Promise<DashboardPayload> {
 
   try {
     const supabase = createSupabaseAdmin();
-    const eventsSince = new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString();
     const [leadsResult, eventsResult, referralLinksResult, settings] = await Promise.all([
       supabase
         .from("waitlist_applications")
@@ -124,9 +123,8 @@ export async function getDashboardPayload(): Promise<DashboardPayload> {
         .select(
           "created_at,event_name,session_id,visitor_id,pageview_id,lead_id,step_number,step_key,percent,cta_location,video_id,elapsed_ms,utm_source,utm_campaign,referral_code,referral_link_id,device_type,browser,os,country,city,conversion_type,value_cents,currency,metadata"
         )
-        .gte("created_at", eventsSince)
         .order("created_at", { ascending: false })
-        .limit(5000),
+        .limit(20_000),
       supabase
         .from("referral_links")
         .select(

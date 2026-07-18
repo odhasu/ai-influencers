@@ -5,6 +5,7 @@ import {
   AtSign,
   BarChart3,
   CalendarCheck,
+  CalendarRange,
   CheckCircle2,
   ChevronRight,
   Clipboard,
@@ -35,6 +36,7 @@ import type { FunnelSettings } from "@/lib/funnel-settings";
 import styles from "./dashboard.module.css";
 
 type Tab = "overview" | "leads" | "referrals" | "settings";
+type AnalyticsRange = "7" | "14" | "30" | "90" | "all" | "custom";
 type ReferralDraft = {
   id?: string;
   label: string;
@@ -62,6 +64,36 @@ const statusLabels: Record<LeadStatus, string> = {
 
 function dayKey(date: Date) {
   return date.toISOString().slice(0, 10);
+}
+
+function dateInputValue(date: Date) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 10);
+}
+
+function analyticsRangeBounds(range: AnalyticsRange, customStart: string, customEnd: string) {
+  const end = range === "custom" && customEnd ? new Date(`${customEnd}T00:00:00`) : new Date();
+  end.setHours(0, 0, 0, 0);
+  const endExclusive = new Date(end);
+  endExclusive.setDate(endExclusive.getDate() + 1);
+
+  if (range === "all") return { startMs: 0, endMs: endExclusive.getTime() };
+
+  const start = range === "custom" && customStart ? new Date(`${customStart}T00:00:00`) : new Date(end);
+  if (range !== "custom") start.setDate(start.getDate() - (Number(range) - 1));
+  start.setHours(0, 0, 0, 0);
+
+  return start <= end
+    ? { startMs: start.getTime(), endMs: endExclusive.getTime() }
+    : { startMs: end.getTime(), endMs: new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1).getTime() };
+}
+
+function analyticsRangeLabel(range: AnalyticsRange, customStart: string, customEnd: string) {
+  if (range === "all") return "All available data";
+  if (range !== "custom") return `Last ${range} days`;
+  if (!customStart || !customEnd) return "Custom date range";
+  const format = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric" });
+  return `${format(customStart)} – ${format(customEnd)}`;
 }
 
 function localDateTime(value: string | null) {
@@ -209,22 +241,48 @@ export function DashboardClient({
   const [savingLead, setSavingLead] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [notice, setNotice] = useState("");
+  const [analyticsRange, setAnalyticsRange] = useState<AnalyticsRange>("30");
+  const [customStart, setCustomStart] = useState(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 29);
+    return dateInputValue(date);
+  });
+  const [customEnd, setCustomEnd] = useState(() => dateInputValue(new Date()));
+
+  const analyticsRangeData = useMemo(
+    () => analyticsRangeBounds(analyticsRange, customStart, customEnd),
+    [analyticsRange, customEnd, customStart]
+  );
+  const analyticsLeads = useMemo(
+    () => leads.filter((lead) => {
+      const timestamp = new Date(lead.created_at).getTime();
+      return timestamp >= analyticsRangeData.startMs && timestamp < analyticsRangeData.endMs;
+    }),
+    [analyticsRangeData, leads]
+  );
+  const analyticsEvents = useMemo(
+    () => initialPayload.events.filter((event) => {
+      const timestamp = new Date(event.created_at).getTime();
+      return timestamp >= analyticsRangeData.startMs && timestamp < analyticsRangeData.endMs;
+    }),
+    [analyticsRangeData, initialPayload.events]
+  );
 
   const analytics = useMemo(() => {
     const sessions = (eventName: string) =>
-      new Set(initialPayload.events.filter((event) => event.event_name === eventName).map((event) => event.session_id))
+      new Set(analyticsEvents.filter((event) => event.event_name === eventName).map((event) => event.session_id))
         .size;
     const visits = sessions("landing_viewed");
     const starts = sessions("form_started");
     const submissions = new Set(
-      initialPayload.events
+      analyticsEvents
         .filter((event) => event.event_name === "form_submit_succeeded")
         .map((event) => event.session_id)
     ).size;
     const today = dayKey(new Date());
-    const todayLeads = leads.filter((lead) => lead.created_at.slice(0, 10) === today).length;
-    const highIntent = leads.filter((lead) => ["$1K - $3K USD", "$3K+ USD"].includes(lead.budget_range)).length;
-    const visitorEvents = initialPayload.events.filter((event) => event.event_name === "page_viewed");
+    const todayLeads = analyticsLeads.filter((lead) => lead.created_at.slice(0, 10) === today).length;
+    const highIntent = analyticsLeads.filter((lead) => ["$1K - $3K USD", "$3K+ USD"].includes(lead.budget_range)).length;
+    const visitorEvents = analyticsEvents.filter((event) => event.event_name === "page_viewed");
     const uniqueVisitors = new Set(visitorEvents.map((event) => event.visitor_id || event.session_id)).size;
     const returningVisitors = new Set(
       visitorEvents
@@ -236,7 +294,7 @@ export function DashboardClient({
     const abandons = sessions("form_abandoned");
     const vslStarts = sessions("vsl_started");
     const vslCompletions = sessions("vsl_completed");
-    const engagementEvents = initialPayload.events.filter((event) => event.event_name === "page_engagement_recorded");
+    const engagementEvents = analyticsEvents.filter((event) => event.event_name === "page_engagement_recorded");
     const averageEngagedMs = engagementEvents.length
       ? engagementEvents.reduce((sum, event) => {
           const value = event.metadata.engaged_ms;
@@ -244,24 +302,33 @@ export function DashboardClient({
         }, 0) / engagementEvents.length
       : 0;
 
-    const trend = Array.from({ length: 7 }, (_, offset) => {
-      const date = new Date();
-      date.setUTCHours(0, 0, 0, 0);
-      date.setUTCDate(date.getUTCDate() - (6 - offset));
-      const key = dayKey(date);
+    const availableStart = analyticsLeads.length
+      ? Math.min(...analyticsLeads.map((lead) => new Date(lead.created_at).getTime()))
+      : analyticsRangeData.endMs - 7 * 86_400_000;
+    const chartStartMs = analyticsRange === "all" ? availableStart : analyticsRangeData.startMs;
+    const totalDays = Math.max(1, Math.ceil((analyticsRangeData.endMs - chartStartMs) / 86_400_000));
+    const bucketDays = Math.max(1, Math.ceil(totalDays / 14));
+    const bucketCount = Math.ceil(totalDays / bucketDays);
+    const trend = Array.from({ length: bucketCount }, (_, offset) => {
+      const bucketStart = chartStartMs + offset * bucketDays * 86_400_000;
+      const bucketEnd = Math.min(analyticsRangeData.endMs, bucketStart + bucketDays * 86_400_000);
+      const date = new Date(bucketStart);
       return {
-        key,
-        label: date.toLocaleDateString("en", { weekday: "short" }),
-        count: leads.filter((lead) => lead.created_at.slice(0, 10) === key).length
+        key: String(bucketStart),
+        label: date.toLocaleDateString("en", bucketDays === 1 ? { weekday: "short" } : { month: "short", day: "numeric" }),
+        count: analyticsLeads.filter((lead) => {
+          const timestamp = new Date(lead.created_at).getTime();
+          return timestamp >= bucketStart && timestamp < bucketEnd;
+        }).length
       };
     });
 
     const byStatus = (Object.keys(statusLabels) as LeadStatus[]).map((status) => ({
       status,
-      count: leads.filter((lead) => lead.lead_status === status).length
+      count: analyticsLeads.filter((lead) => lead.lead_status === status).length
     }));
     const sources = new Map<string, number>();
-    leads.forEach((lead) => {
+    analyticsLeads.forEach((lead) => {
       const referral = referralLinks.find((link) => link.id === lead.referral_link_id || link.code === lead.referral_code);
       const source = referral?.label || lead.referral_code || lead.utm_source || "Direct / unknown";
       sources.set(source, (sources.get(source) ?? 0) + 1);
@@ -290,13 +357,13 @@ export function DashboardClient({
         ["Form starts", starts],
         ["Applications", submissions],
         ["Bookings", bookings],
-        ["Won", leads.filter((lead) => lead.lead_status === "won").length]
+        ["Won", analyticsLeads.filter((lead) => lead.lead_status === "won").length]
       ] as Array<[string, number]>,
       trend,
       byStatus,
       topSources: [...sources.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)
     };
-  }, [initialPayload.events, leads, referralLinks]);
+  }, [analyticsEvents, analyticsLeads, analyticsRange, analyticsRangeData, referralLinks]);
 
   const filteredLeads = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -470,7 +537,17 @@ export function DashboardClient({
         {initialPayload.error ? <div className={styles.errorBanner}>{initialPayload.error}</div> : null}
 
         {activeTab === "overview" ? (
-          <OverviewTab leads={leads} analytics={analytics} />
+          <OverviewTab
+            leads={analyticsLeads}
+            analytics={analytics}
+            range={analyticsRange}
+            rangeLabel={analyticsRangeLabel(analyticsRange, customStart, customEnd)}
+            customStart={customStart}
+            customEnd={customEnd}
+            onRangeChange={setAnalyticsRange}
+            onCustomStartChange={setCustomStart}
+            onCustomEndChange={setCustomEnd}
+          />
         ) : activeTab === "leads" ? (
           <LeadsTab
             leads={filteredLeads}
@@ -522,7 +599,14 @@ export function DashboardClient({
 
 function OverviewTab({
   leads,
-  analytics
+  analytics,
+  range,
+  rangeLabel,
+  customStart,
+  customEnd,
+  onRangeChange,
+  onCustomStartChange,
+  onCustomEndChange
 }: {
   leads: DashboardLead[];
   analytics: {
@@ -548,6 +632,13 @@ function OverviewTab({
     byStatus: Array<{ status: LeadStatus; count: number }>;
     topSources: Array<[string, number]>;
   };
+  range: AnalyticsRange;
+  rangeLabel: string;
+  customStart: string;
+  customEnd: string;
+  onRangeChange: (range: AnalyticsRange) => void;
+  onCustomStartChange: (value: string) => void;
+  onCustomEndChange: (value: string) => void;
 }) {
   const maxTrend = Math.max(1, ...analytics.trend.map((day) => day.count));
   const maxStatus = Math.max(1, ...analytics.byStatus.map((item) => item.count));
@@ -555,8 +646,35 @@ function OverviewTab({
 
   return (
     <div className={styles.content}>
+      <section className={styles.analyticsToolbar} aria-label="Analytics date range">
+        <div className={styles.rangeSummary}>
+          <CalendarRange size={18} />
+          <div><span>Reporting period</span><strong>{rangeLabel}</strong></div>
+        </div>
+        <div className={styles.rangePresets}>
+          {(["7", "14", "30", "90"] as AnalyticsRange[]).map((value) => (
+            <button
+              className={range === value ? styles.rangeActive : ""}
+              key={value}
+              onClick={() => onRangeChange(value)}
+              type="button"
+            >
+              {value} days
+            </button>
+          ))}
+          <button className={range === "all" ? styles.rangeActive : ""} onClick={() => onRangeChange("all")} type="button">All time</button>
+          <button className={range === "custom" ? styles.rangeActive : ""} onClick={() => onRangeChange("custom")} type="button">Custom</button>
+        </div>
+        {range === "custom" ? (
+          <div className={styles.customRange}>
+            <label>From<input type="date" value={customStart} max={customEnd} onChange={(event) => onCustomStartChange(event.target.value)} /></label>
+            <label>To<input type="date" value={customEnd} min={customStart} max={dateInputValue(new Date())} onChange={(event) => onCustomEndChange(event.target.value)} /></label>
+          </div>
+        ) : null}
+      </section>
+
       <section className={styles.metricsGrid}>
-        <MetricCard icon={Users} label="Total leads" value={String(leads.length)} detail={`${analytics.todayLeads} today`} />
+        <MetricCard icon={Users} label="Leads" value={String(leads.length)} detail={`${analytics.todayLeads} today`} />
         <MetricCard icon={MousePointerClick} label="Unique visitors" value={String(analytics.uniqueVisitors)} detail={`${analytics.visits} landing views`} />
         <MetricCard icon={RefreshCw} label="Returning visitors" value={String(analytics.returningVisitors)} detail="Consented visitors" />
         <MetricCard icon={Target} label="Form start rate" value={percentage(analytics.startRate)} detail={`${analytics.starts} starts`} />
@@ -570,7 +688,7 @@ function OverviewTab({
       <section className={styles.overviewGrid}>
         <article className={styles.panelWide}>
           <div className={styles.panelHeader}>
-            <div><p>Performance</p><h2>Leads over the last 7 days</h2></div>
+            <div><p>Performance</p><h2>Leads · {rangeLabel}</h2></div>
             <span>{analytics.trend.reduce((sum, day) => sum + day.count, 0)} leads</span>
           </div>
           <div className={styles.trendChart}>

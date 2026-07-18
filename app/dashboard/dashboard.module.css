@@ -184,6 +184,98 @@
   font-size: 13px;
 }
 
+.analyticsToolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 13px 14px;
+  border: 1px solid var(--dash-line);
+  border-radius: 12px;
+  background: var(--dash-panel);
+}
+
+.rangeSummary {
+  min-width: 190px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--dash-green);
+}
+
+.rangeSummary span,
+.rangeSummary strong {
+  display: block;
+}
+
+.rangeSummary span {
+  color: #6f7972;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.rangeSummary strong {
+  margin-top: 3px;
+  color: #e9eeea;
+  font-size: 12px;
+}
+
+.rangePresets {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+}
+
+.rangePresets button {
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid #29302b;
+  border-radius: 7px;
+  background: #0a0c0b;
+  color: #8e9890;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.rangePresets button:hover,
+.rangePresets button.rangeActive {
+  border-color: #3b7134;
+  background: rgba(57, 255, 20, .08);
+  color: var(--dash-green);
+}
+
+.customRange {
+  display: flex;
+  gap: 8px;
+  padding-left: 12px;
+  border-left: 1px solid var(--dash-line);
+}
+
+.customRange label {
+  display: grid;
+  gap: 4px;
+  color: #707a72;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.customRange input {
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid #29302b;
+  border-radius: 7px;
+  outline: 0;
+  background: #0a0c0b;
+  color: #dfe5e0;
+  color-scheme: dark;
+  font: inherit;
+}
+
 .metricsGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -280,7 +372,7 @@
 .trendChart {
   height: 188px;
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(28px, 1fr));
   align-items: end;
   gap: 11px;
   margin-top: 24px;
@@ -857,6 +949,8 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 1080px) {
+  .analyticsToolbar { align-items: stretch; flex-wrap: wrap; }
+  .rangePresets { order: 3; width: 100%; margin-left: 0; overflow-x: auto; }
   .metricsGrid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .overviewGrid { grid-template-columns: 1fr; }
   .referralLayout { grid-template-columns: 1fr; }
@@ -873,6 +967,11 @@
   .topbar h1 { font-size: 20px; }
   .notice { display: none; }
   .content { padding: 16px; }
+  .analyticsToolbar { padding: 12px; }
+  .rangeSummary { min-width: 0; }
+  .customRange { width: 100%; padding: 10px 0 0; border-top: 1px solid var(--dash-line); border-left: 0; }
+  .customRange label { min-width: 0; flex: 1; }
+  .customRange input { width: 100%; }
   .metricsGrid { grid-template-columns: 1fr 1fr; gap: 9px; }
   .metricCard { min-height: 142px; padding: 14px; }
   .filters { align-items: stretch; flex-wrap: wrap; }
