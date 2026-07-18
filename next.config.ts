@@ -9,9 +9,18 @@ const nextConfig: NextConfig = {
     root: process.cwd()
   },
   async rewrites() {
-    if (!posthogHost) return [];
+    const rewrites: NonNullable<Awaited<ReturnType<NonNullable<NextConfig["rewrites"]>>>> = [
+      {
+        source: "/",
+        has: [{ type: "host", value: "dashborad.authenticresell.com" }],
+        destination: "/dashboard"
+      }
+    ];
+
+    if (!posthogHost) return rewrites;
 
     return [
+      ...rewrites,
       {
         source: "/ingest/static/:path*",
         destination: `${posthogHost}/static/:path*`
