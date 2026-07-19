@@ -6,6 +6,7 @@ import styles from "./login.module.css";
 
 export function AdminLoginForm({ configured }: { configured: boolean }) {
   const [password, setPassword] = useState("");
+  const [rememberDevice, setRememberDevice] = useState(true);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [message, setMessage] = useState("");
 
@@ -18,7 +19,7 @@ export function AdminLoginForm({ configured }: { configured: boolean }) {
     const response = await fetch("/api/admin/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password })
+      body: JSON.stringify({ password, rememberDevice })
     });
     const result = (await response.json()) as { ok?: boolean; message?: string };
     if (!response.ok || !result.ok) {
@@ -52,6 +53,10 @@ export function AdminLoginForm({ configured }: { configured: boolean }) {
           required
           onChange={(event) => setPassword(event.target.value)}
         />
+      </label>
+      <label className={styles.remember}>
+        <input type="checkbox" checked={rememberDevice} onChange={(event) => setRememberDevice(event.target.checked)} />
+        <span>Keep me signed in on this device for 30 days</span>
       </label>
       {status === "error" ? <p className={styles.error}>{message}</p> : null}
       <button type="submit" disabled={status === "loading"}>

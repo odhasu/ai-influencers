@@ -80,6 +80,23 @@
   box-shadow: 0 0 0 3px rgba(57, 255, 20, 0.1);
 }
 
+.remember {
+  display: flex !important;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 9px !important;
+  color: #9ca69f !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+.remember input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #39ff14;
+}
+
 .form button {
   display: flex;
   align-items: center;

@@ -5,7 +5,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 export const adminCookieName = "funnel_admin_session";
-const sessionLifetimeSeconds = 60 * 60 * 24 * 7;
+const rememberedSessionLifetimeSeconds = 60 * 60 * 24 * 30;
+const browserSessionLifetimeSeconds = 60 * 60 * 12;
 
 function credentials() {
   return {
@@ -34,11 +35,12 @@ export function verifyAdminPassword(candidate: string) {
   return timingSafeEqual(digest(candidate), digest(password));
 }
 
-export function createAdminSessionToken() {
+export function createAdminSessionToken(rememberDevice = true) {
   const { secret } = credentials();
   if (!secret) throw new Error("Dashboard session secret is missing.");
 
-  const expiresAt = Math.floor(Date.now() / 1000) + sessionLifetimeSeconds;
+  const lifetimeSeconds = rememberDevice ? rememberedSessionLifetimeSeconds : browserSessionLifetimeSeconds;
+  const expiresAt = Math.floor(Date.now() / 1000) + lifetimeSeconds;
   const signature = createHmac("sha256", secret).update(String(expiresAt)).digest("hex");
   return `${expiresAt}.${signature}`;
 }
@@ -72,5 +74,15 @@ export const adminCookieOptions = {
   sameSite: "strict" as const,
   secure: process.env.NODE_ENV === "production",
   path: "/",
-  maxAge: sessionLifetimeSeconds
+  maxAge: rememberedSessionLifetimeSeconds
 };
+
+export function getAdminCookieOptions(rememberDevice = true) {
+  if (rememberDevice) return adminCookieOptions;
+  return {
+    httpOnly: adminCookieOptions.httpOnly,
+    sameSite: adminCookieOptions.sameSite,
+    secure: adminCookieOptions.secure,
+    path: adminCookieOptions.path
+  };
+}

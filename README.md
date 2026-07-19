@@ -96,6 +96,8 @@ Configured in both Vercel Preview and Production:
 - `DASHBOARD_PASSWORD`
 - `DASHBOARD_SESSION_SECRET`
 
+Dashboard login uses a secure HTTP-only cookie. “Keep me signed in on this device” is enabled by default for a 30-day remembered session; clearing the checkbox creates a browser-session login that expires after 12 hours.
+
 The dashboard password is stored only as an encrypted Vercel environment variable and must never be written into this repository or documentation.
 
 Not currently configured:
