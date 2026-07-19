@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ArrowRight
 } from "lucide-react";
+import Image from "next/image";
 import { PhoneInput } from "react-international-phone";
 import {
   CSSProperties,
@@ -223,6 +224,30 @@ const winImages = [
   ["img_c8UoUK-ppzWBG01LCZUaZ", 320, 247],
   ["img_THYSiha0G-s0V9hIFcFRN", 320, 297],
   ["img_-VnkG34E9THKDzbJUaVAT", 320, 330]
+] as const;
+
+const localWinImages = [
+  {
+    src: "/wins/supreme-socks-win.png",
+    width: 926,
+    height: 850,
+    alt: "Inner Circle member showing Supreme product inventory",
+    timestampMask: { left: "29.35%", top: "2.7%", width: "23.2%", height: "6.35%", backgroundColor: "#08080a" }
+  },
+  {
+    src: "/wins/selling-7846-win.png",
+    width: 744,
+    height: 868,
+    alt: "Inner Circle member showing 7,846 dollars in 90-day sales",
+    timestampMask: { left: "26.75%", top: "2.95%", width: "27.25%", height: "5.45%", backgroundColor: "#1b1b1d" }
+  },
+  {
+    src: "/wins/cash-win.png",
+    width: 768,
+    height: 758,
+    alt: "Inner Circle member showing cash from reselling",
+    timestampMask: { left: "30.65%", top: "0%", width: "25.4%", height: "6.2%", backgroundColor: "#1a1b1f" }
+  }
 ] as const;
 
 function validStep(stepIndex: number, answers: Answers) {
@@ -790,11 +815,28 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
           >
             <h2 id="wins-title">More Inner Circle Wins:</h2>
             <div className="wins-masonry">
+              {localWinImages.map((win, index) => (
+                <span
+                  className="win-image win-image-local"
+                  key={win.src}
+                  style={{ "--win-delay": `${index * 65}ms` } as CSSProperties}
+                >
+                  <Image
+                    src={win.src}
+                    width={win.width}
+                    height={win.height}
+                    alt={win.alt}
+                    sizes="(max-width: 768px) 50vw, 25vw"
+                    quality={90}
+                  />
+                  <span className="win-time-mask" style={win.timestampMask} aria-hidden="true" />
+                </span>
+              ))}
               {winImages.map(([id, width, height], index) => (
                 <span
                   className="win-image"
                   key={`${id}-${index}`}
-                  style={{ "--win-delay": `${index * 65}ms` } as CSSProperties}
+                  style={{ "--win-delay": `${(index + localWinImages.length) * 65}ms` } as CSSProperties}
                 >
                   <picture>
                     <source

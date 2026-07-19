@@ -938,11 +938,32 @@ main {
 }
 
 .win-image {
+  position: relative;
   display: block;
   width: 100%;
   margin: 0 0 16px;
   break-inside: avoid;
   overflow: visible;
+}
+
+.win-time-mask {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  box-shadow: 0 0 2px 1px currentColor;
+  color: inherit;
+}
+
+.win-image-local:nth-child(1) .win-time-mask {
+  color: #08080a;
+}
+
+.win-image-local:nth-child(2) .win-time-mask {
+  color: #1b1b1d;
+}
+
+.win-image-local:nth-child(3) .win-time-mask {
+  color: #1a1b1f;
 }
 
 .win-image picture {

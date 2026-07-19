@@ -5,6 +5,9 @@ const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST?.replace(/\/$/, "");
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   skipTrailingSlashRedirect: true,
+  images: {
+    qualities: [75, 90]
+  },
   turbopack: {
     root: process.cwd()
   },
