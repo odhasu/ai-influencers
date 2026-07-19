@@ -70,7 +70,10 @@ Supabase stores application data, funnel events, referral links, and funnel sett
 
 The dashboard supports:
 
+- Separate Overview, Leads, Analytics, Referral links, and Settings navigation
+- New-versus-handled lead inboxes, where handled includes every status after `new`
 - Searchable and filterable lead list
+- Received-date, custom-date, follow-up-time, exact-status, and sorting filters under Advanced
 - CSV lead export
 - Statuses: new, contacted, qualified, booked, won, and lost
 - Lead notes, tags, assigned owner, and follow-up date
@@ -79,6 +82,7 @@ The dashboard supports:
 - Referral links for Instagram, TikTok, YouTube, communities, and custom placements
 - Editable referral codes, destinations, and UTM values
 - Views, starts, leads, booked calls, wins, losses, and closed-lead metrics
+- Dedicated Analytics reporting with preset, all-time, and custom date ranges
 - Public funnel copy and behavior settings
 - Optional server-side lead webhook
 

@@ -13,6 +13,9 @@ import {
   CircleDollarSign,
   Download,
   ExternalLink,
+  History,
+  Inbox,
+  LayoutDashboard,
   Link2,
   LoaderCircle,
   LogOut,
@@ -26,6 +29,7 @@ import {
   Search,
   Settings2,
   ShieldCheck,
+  SlidersHorizontal,
   Target,
   Trash2,
   Users
@@ -35,8 +39,12 @@ import type { DashboardEvent, DashboardLead, DashboardPayload, LeadStatus, Refer
 import type { FunnelSettings } from "@/lib/funnel-settings";
 import styles from "./dashboard.module.css";
 
-type Tab = "overview" | "leads" | "referrals" | "settings";
+type Tab = "overview" | "leads" | "analytics" | "referrals" | "settings";
 type AnalyticsRange = "7" | "14" | "30" | "90" | "all" | "custom";
+type LeadInbox = "new" | "handled" | "all";
+type LeadTimeRange = "all" | "today" | "7" | "30" | "custom";
+type FollowUpFilter = "all" | "overdue" | "today" | "upcoming" | "none";
+type LeadSort = "newest" | "oldest" | "follow_up";
 type ReferralDraft = {
   id?: string;
   label: string;
@@ -235,7 +243,13 @@ export function DashboardClient({
   const [deletingReferralId, setDeletingReferralId] = useState<string | null>(null);
   const [settings, setSettings] = useState(initialPayload.settings);
   const [search, setSearch] = useState("");
+  const [leadInbox, setLeadInbox] = useState<LeadInbox>("new");
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "all">("all");
+  const [leadTimeRange, setLeadTimeRange] = useState<LeadTimeRange>("all");
+  const [leadCustomStart, setLeadCustomStart] = useState("");
+  const [leadCustomEnd, setLeadCustomEnd] = useState("");
+  const [followUpFilter, setFollowUpFilter] = useState<FollowUpFilter>("all");
+  const [leadSort, setLeadSort] = useState<LeadSort>("newest");
   const [selectedLead, setSelectedLead] = useState<DashboardLead | null>(null);
   const [leadDraft, setLeadDraft] = useState<DashboardLead | null>(null);
   const [savingLead, setSavingLead] = useState(false);
@@ -365,19 +379,60 @@ export function DashboardClient({
     };
   }, [analyticsEvents, analyticsLeads, analyticsRange, analyticsRangeData, referralLinks]);
 
+  const leadCounts = useMemo(() => ({
+    new: leads.filter((lead) => lead.lead_status === "new").length,
+    handled: leads.filter((lead) => lead.lead_status !== "new").length
+  }), [leads]);
+
   const filteredLeads = useMemo(() => {
     const term = search.trim().toLowerCase();
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
+    let receivedStart = 0;
+    let receivedEnd = Number.POSITIVE_INFINITY;
+
+    if (leadTimeRange === "today") receivedStart = todayStart;
+    if (leadTimeRange === "7" || leadTimeRange === "30") {
+      receivedStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (Number(leadTimeRange) - 1)).getTime();
+    }
+    if (leadTimeRange === "custom") {
+      if (leadCustomStart) receivedStart = new Date(`${leadCustomStart}T00:00:00`).getTime();
+      if (leadCustomEnd) {
+        const customEndExclusive = new Date(`${leadCustomEnd}T00:00:00`);
+        customEndExclusive.setDate(customEndExclusive.getDate() + 1);
+        receivedEnd = customEndExclusive.getTime();
+      }
+    }
+
     return leads.filter((lead) => {
+      const matchesInbox = leadInbox === "all" || (leadInbox === "new" ? lead.lead_status === "new" : lead.lead_status !== "new");
       const matchesStatus = statusFilter === "all" || lead.lead_status === statusFilter;
+      const receivedAt = new Date(lead.created_at).getTime();
+      const matchesReceived = receivedAt >= receivedStart && receivedAt < receivedEnd;
+      const followUpAt = lead.follow_up_at ? new Date(lead.follow_up_at).getTime() : null;
+      const matchesFollowUp = followUpFilter === "all"
+        || (followUpFilter === "none" && followUpAt === null)
+        || (followUpFilter === "overdue" && followUpAt !== null && followUpAt < todayStart)
+        || (followUpFilter === "today" && followUpAt !== null && followUpAt >= todayStart && followUpAt < tomorrowStart)
+        || (followUpFilter === "upcoming" && followUpAt !== null && followUpAt >= tomorrowStart);
       const matchesSearch =
         !term ||
         [lead.full_name, lead.email, lead.phone_number, lead.instagram, lead.referral_code ?? "", lead.utm_source ?? ""]
           .join(" ")
           .toLowerCase()
           .includes(term);
-      return matchesStatus && matchesSearch;
+      return matchesInbox && matchesStatus && matchesReceived && matchesFollowUp && matchesSearch;
+    }).sort((a, b) => {
+      if (leadSort === "oldest") return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      if (leadSort === "follow_up") {
+        const aFollowUp = a.follow_up_at ? new Date(a.follow_up_at).getTime() : Number.POSITIVE_INFINITY;
+        const bFollowUp = b.follow_up_at ? new Date(b.follow_up_at).getTime() : Number.POSITIVE_INFINITY;
+        return aFollowUp - bFollowUp;
+      }
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
-  }, [leads, search, statusFilter]);
+  }, [followUpFilter, leadCustomEnd, leadCustomStart, leadInbox, leadSort, leadTimeRange, leads, search, statusFilter]);
 
   function openLead(lead: DashboardLead) {
     setSelectedLead(lead);
@@ -491,16 +546,19 @@ export function DashboardClient({
 
         <nav className={styles.nav} aria-label="Dashboard sections">
           <button className={activeTab === "overview" ? styles.active : ""} onClick={() => setActiveTab("overview")}>
-            <BarChart3 size={18} /> Overview
+            <LayoutDashboard size={18} /> Overview
           </button>
           <button className={activeTab === "leads" ? styles.active : ""} onClick={() => setActiveTab("leads")}>
-            <Users size={18} /> Leads <span className={styles.navCount}>{leads.length}</span>
+            <Users size={18} /> Leads <span className={styles.navCount}>{leadCounts.new}</span>
+          </button>
+          <button className={activeTab === "analytics" ? styles.active : ""} onClick={() => setActiveTab("analytics")}>
+            <BarChart3 size={18} /> Analytics
           </button>
           <button className={activeTab === "referrals" ? styles.active : ""} onClick={() => setActiveTab("referrals")}>
             <Link2 size={18} /> Referral links <span className={styles.navCount}>{referralLinks.length}</span>
           </button>
           <button className={activeTab === "settings" ? styles.active : ""} onClick={() => setActiveTab("settings")}>
-            <Settings2 size={18} /> Funnel settings
+            <Settings2 size={18} /> Settings
           </button>
         </nav>
 
@@ -522,7 +580,7 @@ export function DashboardClient({
         <header className={styles.topbar}>
           <div>
             <p>Funnel operations</p>
-            <h1>{activeTab === "overview" ? "Overview" : activeTab === "leads" ? "Lead pipeline" : activeTab === "referrals" ? "Referral links" : "Funnel settings"}</h1>
+            <h1>{activeTab === "overview" ? "Overview" : activeTab === "leads" ? "Leads" : activeTab === "analytics" ? "Analytics" : activeTab === "referrals" ? "Referral links" : "Settings"}</h1>
           </div>
           <div className={styles.topbarActions}>
             {notice ? <span className={styles.notice}>{notice}</span> : null}
@@ -537,7 +595,14 @@ export function DashboardClient({
         {initialPayload.error ? <div className={styles.errorBanner}>{initialPayload.error}</div> : null}
 
         {activeTab === "overview" ? (
-          <OverviewTab
+          <HomeTab
+            leads={leads}
+            leadCounts={leadCounts}
+            onOpenLead={openLead}
+            onNavigate={setActiveTab}
+          />
+        ) : activeTab === "analytics" ? (
+          <AnalyticsTab
             leads={analyticsLeads}
             analytics={analytics}
             range={analyticsRange}
@@ -551,10 +616,30 @@ export function DashboardClient({
         ) : activeTab === "leads" ? (
           <LeadsTab
             leads={filteredLeads}
+            allLeadsCount={leads.length}
+            counts={leadCounts}
             search={search}
+            inbox={leadInbox}
             statusFilter={statusFilter}
+            timeRange={leadTimeRange}
+            customStart={leadCustomStart}
+            customEnd={leadCustomEnd}
+            followUpFilter={followUpFilter}
+            sort={leadSort}
             onSearch={setSearch}
-            onStatusFilter={setStatusFilter}
+            onInbox={(value) => {
+              setLeadInbox(value);
+              setStatusFilter("all");
+            }}
+            onStatusFilter={(value) => {
+              setStatusFilter(value);
+              if (value !== "all") setLeadInbox("all");
+            }}
+            onTimeRange={setLeadTimeRange}
+            onCustomStart={setLeadCustomStart}
+            onCustomEnd={setLeadCustomEnd}
+            onFollowUpFilter={setFollowUpFilter}
+            onSort={setLeadSort}
             onOpenLead={openLead}
           />
         ) : activeTab === "referrals" ? (
@@ -597,7 +682,75 @@ export function DashboardClient({
   );
 }
 
-function OverviewTab({
+function HomeTab({
+  leads,
+  leadCounts,
+  onOpenLead,
+  onNavigate
+}: {
+  leads: DashboardLead[];
+  leadCounts: { new: number; handled: number };
+  onOpenLead: (lead: DashboardLead) => void;
+  onNavigate: (tab: Tab) => void;
+}) {
+  const [now] = useState(() => Date.now());
+  const dueFollowUps = leads.filter((lead) => lead.follow_up_at && new Date(lead.follow_up_at).getTime() <= now).length;
+  const booked = leads.filter((lead) => lead.lead_status === "booked").length;
+
+  return (
+    <div className={styles.content}>
+      <section className={styles.homeIntro}>
+        <div>
+          <p>Workspace</p>
+          <h2>Stay on top of every application.</h2>
+          <span>Review untouched leads first, then manage follow-ups and performance from their dedicated pages.</span>
+        </div>
+        <div className={styles.homeIntroActions}>
+          <button className={styles.primaryButton} onClick={() => onNavigate("leads")}><Inbox size={17} /> Review new leads</button>
+          <button className={styles.secondaryButton} onClick={() => onNavigate("analytics")}><BarChart3 size={17} /> View analytics</button>
+        </div>
+      </section>
+
+      <section className={styles.metricsGrid}>
+        <MetricCard icon={Inbox} label="New leads" value={String(leadCounts.new)} detail="Needs first review" />
+        <MetricCard icon={History} label="Handled leads" value={String(leadCounts.handled)} detail="Already in progress" />
+        <MetricCard icon={Clock3} label="Follow-ups due" value={String(dueFollowUps)} detail="Scheduled up to now" />
+        <MetricCard icon={CalendarCheck} label="Booked" value={String(booked)} detail="Current pipeline" />
+      </section>
+
+      <section className={styles.overviewGrid}>
+        <article className={styles.panelWide}>
+          <div className={styles.panelHeader}>
+            <div><p>Lead activity</p><h2>Latest applications</h2></div>
+            <button className={styles.panelLink} onClick={() => onNavigate("leads")}>View all <ChevronRight size={15} /></button>
+          </div>
+          <div className={styles.recentList}>
+            {leads.slice(0, 7).map((lead) => (
+              <button type="button" key={lead.id} onClick={() => onOpenLead(lead)}>
+                <div className={styles.avatar}>{lead.full_name.slice(0, 2).toUpperCase()}</div>
+                <div><strong>{lead.full_name}</strong><span>{lead.email}</span></div>
+                <span className={`${styles.status} ${styles[lead.lead_status]}`}>{statusLabels[lead.lead_status]}</span>
+                <p>{new Date(lead.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</p>
+              </button>
+            ))}
+            {!leads.length ? <p className={styles.emptyText}>No applications yet. New submissions will appear here automatically.</p> : null}
+          </div>
+        </article>
+
+        <article className={styles.panel}>
+          <div className={styles.panelHeader}><div><p>Inbox guide</p><h2>New and handled</h2></div></div>
+          <div className={styles.inboxGuide}>
+            <div><Inbox size={18} /><span><strong>New</strong><small>Just arrived and still needs its first review.</small></span><b>{leadCounts.new}</b></div>
+            <div><History size={18} /><span><strong>Handled</strong><small>Contacted, qualified, booked, won, or lost.</small></span><b>{leadCounts.handled}</b></div>
+          </div>
+          <button className={styles.secondaryButton} onClick={() => onNavigate("leads")}>Manage lead inbox <ChevronRight size={15} /></button>
+        </article>
+      </section>
+    </div>
+  );
+}
+
+function AnalyticsTab({
   leads,
   analytics,
   range,
@@ -776,34 +929,113 @@ function MetricCard({ icon: Icon, label, value, detail }: { icon: typeof Users; 
 
 function LeadsTab({
   leads,
+  allLeadsCount,
+  counts,
   search,
+  inbox,
   statusFilter,
+  timeRange,
+  customStart,
+  customEnd,
+  followUpFilter,
+  sort,
   onSearch,
+  onInbox,
   onStatusFilter,
+  onTimeRange,
+  onCustomStart,
+  onCustomEnd,
+  onFollowUpFilter,
+  onSort,
   onOpenLead
 }: {
   leads: DashboardLead[];
+  allLeadsCount: number;
+  counts: { new: number; handled: number };
   search: string;
+  inbox: LeadInbox;
   statusFilter: LeadStatus | "all";
+  timeRange: LeadTimeRange;
+  customStart: string;
+  customEnd: string;
+  followUpFilter: FollowUpFilter;
+  sort: LeadSort;
   onSearch: (value: string) => void;
+  onInbox: (value: LeadInbox) => void;
   onStatusFilter: (value: LeadStatus | "all") => void;
+  onTimeRange: (value: LeadTimeRange) => void;
+  onCustomStart: (value: string) => void;
+  onCustomEnd: (value: string) => void;
+  onFollowUpFilter: (value: FollowUpFilter) => void;
+  onSort: (value: LeadSort) => void;
   onOpenLead: (lead: DashboardLead) => void;
 }) {
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   return (
     <div className={styles.content}>
       <section className={styles.leadsPanel}>
+        <div className={styles.leadSegments} role="group" aria-label="Lead inbox">
+          <button className={inbox === "new" ? styles.segmentActive : ""} onClick={() => onInbox("new")}>
+            <Inbox size={17} /><span><strong>New</strong><small>Not reviewed yet</small></span><b>{counts.new}</b>
+          </button>
+          <button className={inbox === "handled" ? styles.segmentActive : ""} onClick={() => onInbox("handled")}>
+            <History size={17} /><span><strong>Handled</strong><small>Already in progress</small></span><b>{counts.handled}</b>
+          </button>
+          <button className={inbox === "all" ? styles.segmentActive : ""} onClick={() => onInbox("all")}>
+            <Users size={17} /><span><strong>All leads</strong><small>Entire pipeline</small></span><b>{allLeadsCount}</b>
+          </button>
+        </div>
+
         <div className={styles.filters}>
           <label className={styles.search}><Search size={17} /><input value={search} placeholder="Search name, email, phone or source" onChange={(event) => onSearch(event.target.value)} /></label>
-          <select value={statusFilter} onChange={(event) => onStatusFilter(event.target.value as LeadStatus | "all")}>
-            <option value="all">All statuses</option>
-            {(Object.keys(statusLabels) as LeadStatus[]).map((status) => <option value={status} key={status}>{statusLabels[status]}</option>)}
+          <select aria-label="Received date" value={timeRange} onChange={(event) => onTimeRange(event.target.value as LeadTimeRange)}>
+            <option value="all">Received: any time</option>
+            <option value="today">Received: today</option>
+            <option value="7">Received: last 7 days</option>
+            <option value="30">Received: last 30 days</option>
+            <option value="custom">Received: custom dates</option>
           </select>
+          <button className={`${styles.advancedButton} ${showAdvanced ? styles.advancedActive : ""}`} type="button" onClick={() => setShowAdvanced((current) => !current)}>
+            <SlidersHorizontal size={16} /> Advanced
+          </button>
           <span className={styles.resultCount}>{leads.length} results</span>
         </div>
 
+        {timeRange === "custom" || showAdvanced ? (
+          <div className={styles.advancedFilters}>
+            {timeRange === "custom" ? (
+              <div className={styles.advancedFieldGroup}>
+                <label>Received from<input type="date" value={customStart} max={customEnd || undefined} onChange={(event) => onCustomStart(event.target.value)} /></label>
+                <label>Received to<input type="date" value={customEnd} min={customStart || undefined} onChange={(event) => onCustomEnd(event.target.value)} /></label>
+              </div>
+            ) : null}
+            {showAdvanced ? (
+              <>
+                <label>Exact status<select value={statusFilter} onChange={(event) => onStatusFilter(event.target.value as LeadStatus | "all")}>
+                  <option value="all">Any status</option>
+                  {(Object.keys(statusLabels) as LeadStatus[]).map((status) => <option value={status} key={status}>{statusLabels[status]}</option>)}
+                </select></label>
+                <label>Follow-up time<select value={followUpFilter} onChange={(event) => onFollowUpFilter(event.target.value as FollowUpFilter)}>
+                  <option value="all">Any follow-up</option>
+                  <option value="overdue">Overdue</option>
+                  <option value="today">Due today</option>
+                  <option value="upcoming">Upcoming</option>
+                  <option value="none">Not scheduled</option>
+                </select></label>
+                <label>Sort by<select value={sort} onChange={(event) => onSort(event.target.value as LeadSort)}>
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                  <option value="follow_up">Next follow-up</option>
+                </select></label>
+              </>
+            ) : null}
+          </div>
+        ) : null}
+
         <div className={styles.tableWrap}>
           <table className={styles.table}>
-            <thead><tr><th>Lead</th><th>Status</th><th>Budget</th><th>Source</th><th>Submitted</th><th /></tr></thead>
+            <thead><tr><th>Lead</th><th>Status</th><th>Budget</th><th>Source</th><th>Received</th><th>Follow-up</th><th /></tr></thead>
             <tbody>
               {leads.map((lead) => (
                 <tr key={lead.id} onClick={() => onOpenLead(lead)}>
@@ -811,7 +1043,8 @@ function LeadsTab({
                   <td><span className={`${styles.status} ${styles[lead.lead_status]}`}>{statusLabels[lead.lead_status]}</span></td>
                   <td>{lead.budget_range}</td>
                   <td>{lead.referral_code || lead.utm_source || "Direct"}</td>
-                  <td>{new Date(lead.created_at).toLocaleDateString()}</td>
+                  <td><time dateTime={lead.created_at}>{new Date(lead.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</time></td>
+                  <td>{lead.follow_up_at ? <time dateTime={lead.follow_up_at}>{new Date(lead.follow_up_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</time> : <span className={styles.mutedCell}>Not scheduled</span>}</td>
                   <td><ChevronRight size={17} /></td>
                 </tr>
               ))}
@@ -1050,12 +1283,22 @@ function LeadDrawer({
         </div>
 
         <div className={styles.drawerForm}>
-          <label>Status<select value={lead.lead_status} onChange={(event) => onChange({ ...lead, lead_status: event.target.value as LeadStatus })}>{(Object.keys(statusLabels) as LeadStatus[]).map((status) => <option value={status} key={status}>{statusLabels[status]}</option>)}</select></label>
-          <label>Follow up<input type="datetime-local" value={localDateTime(lead.follow_up_at)} onChange={(event) => onChange({ ...lead, follow_up_at: event.target.value ? new Date(event.target.value).toISOString() : null })} /></label>
+          <label>Pipeline status<select value={lead.lead_status} onChange={(event) => onChange({ ...lead, lead_status: event.target.value as LeadStatus })}>{(Object.keys(statusLabels) as LeadStatus[]).map((status) => <option value={status} key={status}>{statusLabels[status]}</option>)}</select></label>
+          <label>Follow-up date and time<input type="datetime-local" value={localDateTime(lead.follow_up_at)} onChange={(event) => onChange({ ...lead, follow_up_at: event.target.value ? new Date(event.target.value).toISOString() : null })} /></label>
           <label>Assigned to<input value={lead.assigned_to ?? ""} placeholder="Team member" onChange={(event) => onChange({ ...lead, assigned_to: event.target.value || null })} /></label>
           <label>Tags<input value={lead.tags.join(", ")} placeholder="hot, follow-up" onChange={(event) => onChange({ ...lead, tags: event.target.value.split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 10) })} /></label>
           <label className={styles.fullField}>Notes<textarea value={lead.notes} placeholder="Add context from calls and DMs…" onChange={(event) => onChange({ ...lead, notes: event.target.value })} /></label>
         </div>
+
+        <section className={styles.timelineSection}>
+          <div><p>Timeline</p><h3>Lead timing</h3></div>
+          <dl>
+            <div><dt>Application received</dt><dd>{new Date(lead.created_at).toLocaleString()}</dd></div>
+            <div><dt>Record last updated</dt><dd>{new Date(lead.updated_at).toLocaleString()}</dd></div>
+            <div><dt>Last contacted</dt><dd>{lead.last_contacted_at ? new Date(lead.last_contacted_at).toLocaleString() : "Not contacted yet"}</dd></div>
+            <div><dt>Next follow-up</dt><dd>{lead.follow_up_at ? new Date(lead.follow_up_at).toLocaleString() : "Not scheduled"}</dd></div>
+          </dl>
+        </section>
 
         <section className={styles.qualification}>
           <h3>Qualification</h3>
@@ -1128,7 +1371,7 @@ function SettingsTab({
         </section>
 
         <section className={styles.settingsSection}>
-          <div className={styles.settingsHeading}><div className={styles.settingsIcon}><ShieldCheck size={18} /></div><div><h2>Integrations</h2><p>Public IDs are stored in settings; secret webhook URLs remain server-only.</p></div></div>
+          <div className={styles.settingsHeading}><div className={styles.settingsIcon}><ShieldCheck size={18} /></div><div><h2>Integrations <span className={styles.advancedBadge}>Advanced</span></h2><p>Public IDs are stored in settings; secret webhook URLs remain server-only.</p></div></div>
           <div className={styles.integrationStatus}><span className={webhookConfigured ? styles.connected : styles.disconnected}>{webhookConfigured ? "Webhook environment configured" : "Webhook environment not configured"}</span></div>
           <div className={styles.switchList}><SwitchRow title="Send new-lead webhook" description="Requires LEAD_WEBHOOK_URL in the server environment." checked={settings.webhookEnabled} disabled={!webhookConfigured} onChange={(value) => set("webhookEnabled", value)} /></div>
           <div className={styles.settingsGrid}>
