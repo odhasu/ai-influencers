@@ -251,6 +251,10 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
   const viewedStepsRef = useRef(new Set<number>());
   const formViewedRef = useRef(false);
   const calendlyRef = useRef<HTMLDivElement>(null);
+  const winsRef = useRef<HTMLElement>(null);
+  const finalCtaRef = useRef<HTMLDivElement>(null);
+  const [winsVisible, setWinsVisible] = useState(false);
+  const [finalCtaVisible, setFinalCtaVisible] = useState(false);
   const fieldFocusRef = useRef(new Map<AnswerKey, number>());
   const stepViewedAtRef = useRef(0);
   const abandonmentTrackedRef = useRef(false);
@@ -378,6 +382,33 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
 
     observer.observe(formRef.current);
     return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const observers: IntersectionObserver[] = [];
+    const observeReveal = (
+      element: Element | null,
+      reveal: () => void,
+      threshold: number,
+      rootMargin = "0px 0px -8%"
+    ) => {
+      if (!element) return;
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (!entry.isIntersecting) return;
+          reveal();
+          observer.disconnect();
+        },
+        { threshold, rootMargin }
+      );
+      observer.observe(element);
+      observers.push(observer);
+    };
+
+    observeReveal(winsRef.current, () => setWinsVisible(true), 0.16);
+    observeReveal(finalCtaRef.current, () => setFinalCtaVisible(true), 0.4, "0px");
+
+    return () => observers.forEach((observer) => observer.disconnect());
   }, []);
 
   function markFormStarted() {
@@ -752,11 +783,19 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
         </section>
 
         {settings.showWins ? (
-          <section className="wins" aria-labelledby="wins-title">
+          <section
+            ref={winsRef}
+            className={`wins reveal-target${winsVisible ? " is-visible" : ""}`}
+            aria-labelledby="wins-title"
+          >
             <h2 id="wins-title">More Inner Circle Wins:</h2>
             <div className="wins-masonry">
               {winImages.map(([id, width, height], index) => (
-                <span className="win-image" key={`${id}-${index}`}>
+                <span
+                  className="win-image"
+                  key={`${id}-${index}`}
+                  style={{ "--win-delay": `${index * 65}ms` } as CSSProperties}
+                >
                   <picture>
                     <source
                       type="image/avif"
@@ -788,7 +827,10 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
           </section>
         ) : null}
 
-        <div className="button-wrap final-cta">
+        <div
+          ref={finalCtaRef}
+          className={`button-wrap final-cta reveal-target${finalCtaVisible ? " is-visible" : ""}`}
+        >
           <button className="cta-button" type="button" onClick={() => scrollToForm("page_end")}>
             {settings.ctaLabel}
           </button>

@@ -32,10 +32,7 @@ export function AnalyticsConsent() {
 
   return (
     <aside className="analytics-consent" aria-label="Analytics preference">
-      <p>
-        We use privacy-safe analytics to understand campaign performance and improve this application.
-        Form entries are never sent to analytics and replay inputs are masked.
-      </p>
+      <span className="analytics-consent-title">Analytics preferences</span>
       <div>
         <button
           className="consent-secondary"
