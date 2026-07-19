@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { AnalyticsConsent } from "@/components/analytics-consent";
 import { AnalyticsPageTracker } from "@/components/analytics-page-tracker";
 import "react-international-phone/style.css";
 import "./globals.css";
@@ -15,7 +14,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         {children}
         <AnalyticsPageTracker />
-        <AnalyticsConsent />
       </body>
     </html>
   );
