@@ -1,9 +1,11 @@
 import { isAdminAuthenticated } from "@/lib/admin-auth";
+import { isSameOriginBrowserRequest, readBoundedJson } from "@/lib/api-security";
 import {
   serializeFunnelSettings,
   type FunnelSettings
 } from "@/lib/funnel-settings";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
+import { revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -32,11 +34,19 @@ const settingsSchema = z.object({
 });
 
 export async function PUT(request: Request) {
+  if (!isSameOriginBrowserRequest(request)) {
+    return NextResponse.json({ ok: false, message: "Forbidden." }, { status: 403 });
+  }
   if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ ok: false, message: "Unauthorized." }, { status: 401 });
   }
 
-  const parsed = settingsSchema.safeParse(await request.json().catch(() => null));
+  const body = await readBoundedJson(request, 16 * 1024);
+  if (!body.ok) {
+    const status = body.error === "unsupported_media_type" ? 415 : body.error === "payload_too_large" ? 413 : 400;
+    return NextResponse.json({ ok: false, message: "Invalid settings payload." }, { status });
+  }
+  const parsed = settingsSchema.safeParse(body.value);
   if (!parsed.success) {
     return NextResponse.json(
       { ok: false, message: "Check the highlighted settings and try again." },
@@ -52,6 +62,7 @@ export async function PUT(request: Request) {
       .upsert(serializeFunnelSettings(settings), { onConflict: "id" });
 
     if (error) throw error;
+    revalidateTag("funnel-settings", "max");
     return NextResponse.json({ ok: true, settings });
   } catch {
     return NextResponse.json({ ok: false, message: "Settings could not be saved." }, { status: 503 });

@@ -1,27 +1,35 @@
 "use client";
 
 import { Play } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export const testimonials = [
-  ["IE0_sR4QfRg", "He makes $25,000/m selling unbranded glasses"],
-  ["-yUZ4U91dVQ", "He's Doing $20,000/Month With High Ticket Reselling"],
-  ["7xr2eSPviGM", "$0 to $30,000/Month in 6 Months"],
-  ["K4zdxmcqkcQ", "16 Year Old: $0 → $27K/Month"],
-  ["evjICkbXsig", "15 Year Old Hitting $22K/Month"],
-  ["uP7VTQFMmFY", "From Trampoline Park to $21K/Month"],
-  ["fX0Jrb7-bkI", "He Bought a C8 Corvette From Reselling"],
-  ["A8NgC6evgpA", "16 Year Old: $0 → $8K/Month"],
-  ["I80B0-LlEUk", "16 Year Old Made $70,000 With High Ticket Reselling"],
-  ["JsOt0YROtMk", "He's 15 and Makes $10,000/Month"]
+  ["IE0_sR4QfRg", "Member story: building a focused product strategy"],
+  ["-yUZ4U91dVQ", "Member story: developing a high-ticket workflow"],
+  ["7xr2eSPviGM", "Member story: lessons from the first six months"],
+  ["K4zdxmcqkcQ", "Member story: starting a reselling operation"],
+  ["evjICkbXsig", "Member story: learning the fundamentals"],
+  ["uP7VTQFMmFY", "Member story: moving from side project to process"],
+  ["fX0Jrb7-bkI", "Member story: staying consistent while growing"],
+  ["A8NgC6evgpA", "Member story: improving sourcing decisions"],
+  ["I80B0-LlEUk", "Member story: building repeatable systems"],
+  ["JsOt0YROtMk", "Member story: early lessons from reselling"]
 ] as const;
 
 type TestimonialGridProps = {
   onPlay?: (videoId: string, position: number) => void;
+  limit?: number;
 };
 
-export function TestimonialGrid({ onPlay }: TestimonialGridProps) {
+export function TestimonialGrid({ onPlay, limit = testimonials.length }: TestimonialGridProps) {
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
+  const playerRef = useRef<HTMLIFrameElement>(null);
+  const triggerRefs = useRef(new Map<string, HTMLButtonElement>());
+  const visibleTestimonials = testimonials.slice(0, Math.max(0, limit));
+
+  useEffect(() => {
+    if (activeVideo) playerRef.current?.focus();
+  }, [activeVideo]);
 
   function play(videoId: string, position: number) {
     setActiveVideo(videoId);
@@ -30,12 +38,14 @@ export function TestimonialGrid({ onPlay }: TestimonialGridProps) {
 
   return (
     <div className="video-grid">
-      {testimonials.map(([id, title], index) =>
+      {visibleTestimonials.map(([id, title], index) =>
         activeVideo === id ? (
           <article className="video-card active" key={id}>
             <span className="video-thumb video-player">
               <iframe
+                ref={playerRef}
                 title={title}
+                tabIndex={-1}
                 src={`https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
@@ -45,12 +55,26 @@ export function TestimonialGrid({ onPlay }: TestimonialGridProps) {
               <span className="video-title">{title}</span>
               <span className="video-source">Inner Circle Member</span>
             </span>
+            <button
+              className="video-card-close"
+              type="button"
+              onClick={() => {
+                setActiveVideo(null);
+                window.requestAnimationFrame(() => triggerRefs.current.get(id)?.focus());
+              }}
+            >
+              Close video
+            </button>
           </article>
         ) : (
           <button
             className="video-card"
             type="button"
             key={id}
+            ref={(element) => {
+              if (element) triggerRefs.current.set(id, element);
+              else triggerRefs.current.delete(id);
+            }}
             aria-label={`Play testimonial: ${title}`}
             onClick={() => play(id, index + 1)}
           >

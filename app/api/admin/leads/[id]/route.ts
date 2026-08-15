@@ -1,4 +1,5 @@
 import { isAdminAuthenticated } from "@/lib/admin-auth";
+import { isSameOriginBrowserRequest, readBoundedJson } from "@/lib/api-security";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -14,6 +15,9 @@ const leadUpdateSchema = z
   .strict();
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
+  if (!isSameOriginBrowserRequest(request)) {
+    return NextResponse.json({ ok: false, message: "Forbidden." }, { status: 403 });
+  }
   if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ ok: false, message: "Unauthorized." }, { status: 401 });
   }
@@ -23,7 +27,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return NextResponse.json({ ok: false, message: "Invalid lead ID." }, { status: 400 });
   }
 
-  const parsed = leadUpdateSchema.safeParse(await request.json().catch(() => null));
+  const body = await readBoundedJson(request, 8 * 1024);
+  if (!body.ok) {
+    const status = body.error === "unsupported_media_type" ? 415 : body.error === "payload_too_large" ? 413 : 400;
+    return NextResponse.json({ ok: false, message: "Invalid lead update payload." }, { status });
+  }
+  const parsed = leadUpdateSchema.safeParse(body.value);
   if (!parsed.success || Object.keys(parsed.data).length === 0) {
     return NextResponse.json({ ok: false, message: "No valid changes were provided." }, { status: 400 });
   }

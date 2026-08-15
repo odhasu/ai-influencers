@@ -1,7 +1,9 @@
 import { timingSafeEqual } from "node:crypto";
+import { readBoundedJson } from "@/lib/api-security";
 import { captureServerEvent } from "@/lib/posthog/server";
+import { consumeRateLimit } from "@/lib/rate-limit";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -12,7 +14,12 @@ const conversionSchema = z.object({
   external_id: z.string().trim().min(2).max(200),
   occurred_at: z.iso.datetime().optional(),
   value_cents: z.number().int().min(0).max(1_000_000_000).optional(),
-  currency: z.string().trim().length(3).transform((value) => value.toUpperCase()).optional(),
+  currency: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z]{3}$/)
+    .transform((value) => value.toUpperCase())
+    .optional(),
   provider: z.string().trim().max(80).default("external"),
   product_id: z.string().trim().max(120).optional()
 });
@@ -29,11 +36,35 @@ export async function POST(request: Request) {
   if (!ingestSecret) {
     return NextResponse.json({ ok: false, message: "Conversion ingestion is not configured." }, { status: 503 });
   }
+
+  const rateLimit = await consumeRateLimit({
+    request,
+    scope: "conversion_ingest",
+    limit: 120,
+    windowSeconds: 60
+  });
+  if (!rateLimit.available) {
+    return NextResponse.json(
+      { ok: false, message: "Conversion ingestion is temporarily unavailable." },
+      { status: 503, headers: { "Retry-After": String(rateLimit.retryAfterSeconds), "Cache-Control": "no-store" } }
+    );
+  }
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { ok: false, message: "Too many requests." },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds), "Cache-Control": "no-store" } }
+    );
+  }
   if (!authorized(request, ingestSecret)) {
     return NextResponse.json({ ok: false, message: "Unauthorized." }, { status: 401 });
   }
 
-  const parsed = conversionSchema.safeParse(await request.json().catch(() => null));
+  const body = await readBoundedJson(request, 16 * 1024);
+  if (!body.ok) {
+    const status = body.error === "unsupported_media_type" ? 415 : body.error === "payload_too_large" ? 413 : 400;
+    return NextResponse.json({ ok: false, message: "Invalid conversion payload." }, { status });
+  }
+  const parsed = conversionSchema.safeParse(body.value);
   if (!parsed.success) {
     return NextResponse.json({ ok: false, message: "Invalid conversion payload." }, { status: 400 });
   }
@@ -96,7 +127,7 @@ export async function POST(request: Request) {
     }
 
     if (lead.analytics_consent) {
-      await captureServerEvent({
+      after(() => captureServerEvent({
         distinctId: lead.posthog_distinct_id || lead.id,
         event: parsed.data.event,
         properties: {
@@ -107,7 +138,7 @@ export async function POST(request: Request) {
           currency: parsed.data.currency ?? null,
           source: "server"
         }
-      });
+      }));
     }
 
     return NextResponse.json({ ok: true });

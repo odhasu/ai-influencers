@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { unstable_cache } from "next/cache";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 
 export type FunnelSettings = {
@@ -25,14 +26,14 @@ export type FunnelSettings = {
 
 export const defaultFunnelSettings: FunnelSettings = {
   campaignName: "Inner Circle Waitlist",
-  heroHeadline:
-    "See How Regular People Are Building $5K-$30K/Month High-Ticket Reselling Businesses",
-  heroBody: "",
-  waitlistHeading: "Apply Now",
-  ctaLabel: "Get Started Now",
+  heroHeadline: "Build a More Structured High-Ticket Reselling Business",
+  heroBody:
+    "Apply to discuss your reselling experience, goals, and whether the Inner Circle is the right next step.",
+  waitlistHeading: "Apply to the Inner Circle",
+  ctaLabel: "Start your application",
   accentColor: "#39FF14",
   formEnabled: true,
-  autoAdvanceDelayMs: 240,
+  autoAdvanceDelayMs: 0,
   showWins: true,
   thankYouVideoUrl:
     "https://stream.clyro.io/v/8V01yqULxPLLwB0100E2lRPpd00CFZVm00V4X02l02QjMnvxrc.m3u8",
@@ -126,4 +127,14 @@ export async function getFunnelSettings(client?: SupabaseClient): Promise<Funnel
   } catch {
     return defaultFunnelSettings;
   }
+}
+
+const readCachedPublicFunnelSettings = unstable_cache(
+  () => getFunnelSettings(),
+  ["public-funnel-settings"],
+  { revalidate: 60, tags: ["funnel-settings"] }
+);
+
+export function getPublicFunnelSettings() {
+  return readCachedPublicFunnelSettings();
 }

@@ -2,9 +2,16 @@
 
 import {
   ArrowLeft,
-  ArrowRight
+  ArrowRight,
+  CalendarCheck2,
+  Check,
+  Clock3,
+  SearchCheck,
+  ShieldCheck,
+  TrendingUp
 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { PhoneInput } from "react-international-phone";
 import {
   CSSProperties,
@@ -15,6 +22,7 @@ import {
   useState
 } from "react";
 import { CinematicCurtain } from "@/components/cinematic-curtain";
+import { TestimonialGrid } from "@/components/testimonial-grid";
 import {
   captureFunnelEvent,
   getPosthogDistinctId,
@@ -69,8 +77,62 @@ declare global {
 const calendlyUrl =
   "https://calendly.com/ogvendorss/htr-call?hide_event_type_details=1&hide_gdpr_banner=1&background_color=ffffff&text_color=111111&primary_color=000000";
 
-const brandedHeroHeadline =
+const legacyHeroHeadline =
   "See How Regular People Are Building $5K-$30K/Month High-Ticket Reselling Businesses";
+const safeHeroHeadline = "Build a More Structured High-Ticket Reselling Business";
+
+const fallbackHeroBody =
+  "Apply to discuss your reselling experience, goals, and whether the Inner Circle is the right next step.";
+
+const programPillars = [
+  {
+    icon: SearchCheck,
+    number: "01",
+    title: "Source with a process",
+    copy: "Learn how to evaluate products, suppliers, and margins before you commit capital."
+  },
+  {
+    icon: ShieldCheck,
+    number: "02",
+    title: "Operate with confidence",
+    copy: "Use clearer listing, pricing, and fulfillment workflows instead of guessing your next move."
+  },
+  {
+    icon: TrendingUp,
+    number: "03",
+    title: "Improve with coaching",
+    copy: "Bring real questions to live coaching and leave with a focused plan for the week ahead."
+  }
+] as const;
+
+const frequentlyAskedQuestions = [
+  {
+    question: "Is the Inner Circle suitable for beginners?",
+    answer:
+      "Yes. Your application helps us understand your current experience, goals, and starting point before the call."
+  },
+  {
+    question: "What happens after I apply?",
+    answer:
+      "After submitting, you can choose a call time. The call is used to discuss your situation, answer questions, and decide whether the program is a good fit."
+  },
+  {
+    question: "Are results or income guaranteed?",
+    answer:
+      "No. The examples on this page are individual member outcomes, not a promise of future earnings. Results depend on experience, effort, decisions, and market conditions."
+  },
+  {
+    question: "What should I prepare for the call?",
+    answer:
+      "Come ready to discuss your current reselling experience, goals, available time, and the resources you can realistically commit."
+  }
+] as const;
+
+const fieldLabels: Partial<Record<AnswerKey, string>> = {
+  email: "Email address",
+  full_name: "Full name",
+  phone_number: "Phone number"
+};
 
 const steps: ReadonlyArray<FunnelStep> = [
   {
@@ -114,10 +176,9 @@ const steps: ReadonlyArray<FunnelStep> = [
         id: "age_range",
         type: "button-group",
         options: [
-          ["A", "13 - 17"],
-          ["B", "18 - 23"],
-          ["C", "24 - 35"],
-          ["D", "35+"]
+          ["A", "18 - 23"],
+          ["B", "24 - 35"],
+          ["C", "35+"]
         ]
       }
     ]
@@ -155,7 +216,7 @@ const steps: ReadonlyArray<FunnelStep> = [
   {
     key: "budget",
     title: "What budget range do you have for this?",
-    subtitle: "My program involves an upfront investment to help you scale to $5K–$30K+ per month.",
+    subtitle: "The Inner Circle is a paid program. Choose the range you could realistically invest if it is a strong fit.",
     fields: [
       {
         id: "budget_range",
@@ -178,10 +239,7 @@ const steps: ReadonlyArray<FunnelStep> = [
       {
         id: "call_commitment",
         type: "button-group",
-        options: [
-          ["A", "Yes"],
-          ["B", "No"]
-        ]
+        options: [["A", "Yes"]]
       }
     ]
   }
@@ -220,7 +278,6 @@ const winImages = [
   ["img_BJJDWD-vpL3s5ReJ7xVRf", 320, 344],
   ["img_X03lhN_oXgzh5wruDnHvK", 320, 304],
   ["img_nG7-m6JupiCweZYe-XPse", 320, 228],
-  ["img_VRuUWur-OD6ZxrBq6U1WF", 320, 351],
   ["img_c8UoUK-ppzWBG01LCZUaZ", 320, 247],
   ["img_THYSiha0G-s0V9hIFcFRN", 320, 297],
   ["img_-VnkG34E9THKDzbJUaVAT", 320, 330]
@@ -261,13 +318,30 @@ function validStep(stepIndex: number, answers: Answers) {
   });
 }
 
+function validationMessage(stepIndex: number, answers: Answers) {
+  const current = steps[stepIndex];
+  if (current.key === "email") return "Enter a valid email address.";
+  if (current.key === "contact") {
+    if (!answers.full_name.trim()) return "Enter your full name.";
+    if (answers.phone_number.replace(/\D/g, "").length < 7) return "Enter a valid phone number.";
+  }
+  if (current.key === "call-commitment") {
+    return "Only continue if you can commit to the call time you choose.";
+  }
+  return "Choose an option before continuing.";
+}
+
 export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
   const [answers, setAnswers] = useState<Answers>(initialAnswers);
   const [currentStep, setCurrentStep] = useState(0);
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [validationVisible, setValidationVisible] = useState(false);
+  const [showAllWins, setShowAllWins] = useState(false);
 
   const formRef = useRef<HTMLFormElement>(null);
+  const applicationTitleRef = useRef<HTMLHeadingElement>(null);
+  const bookingHeadingRef = useRef<HTMLHeadingElement>(null);
+  const stepTitleRef = useRef<HTMLHeadingElement>(null);
   const honeypotRef = useRef<HTMLInputElement>(null);
   const choiceTimerRef = useRef<number | null>(null);
   const formStartedAtRef = useRef<number | null>(null);
@@ -276,21 +350,31 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
   const viewedStepsRef = useRef(new Set<number>());
   const formViewedRef = useRef(false);
   const calendlyRef = useRef<HTMLDivElement>(null);
-  const winsRef = useRef<HTMLElement>(null);
-  const finalCtaRef = useRef<HTMLDivElement>(null);
-  const [winsVisible, setWinsVisible] = useState(false);
-  const [finalCtaVisible, setFinalCtaVisible] = useState(false);
   const fieldFocusRef = useRef(new Map<AnswerKey, number>());
   const stepViewedAtRef = useRef(0);
   const abandonmentTrackedRef = useRef(false);
   const submittedRef = useRef(false);
+  const submissionInFlightRef = useRef(false);
   const bookingStartedRef = useRef(false);
-  const bookingCompletedRef = useRef(false);
   const leadIdRef = useRef("");
   const currentStepRef = useRef(0);
 
   const step = steps[currentStep];
   const isReady = useMemo(() => validStep(currentStep, answers), [answers, currentStep]);
+  const visibleWinImages = showAllWins ? winImages : winImages.slice(0, 6);
+  const bookingUrl = settings.bookingUrl.trim() || calendlyUrl;
+  const structuredHeadline =
+    settings.heroHeadline === legacyHeroHeadline || settings.heroHeadline === safeHeroHeadline;
+  const proofTarget = settings.showWins ? "#results" : "#stories";
+  const themeStyle = { "--green": settings.accentColor } as CSSProperties;
+  const usesCalendly = useMemo(() => {
+    try {
+      const hostname = new URL(bookingUrl).hostname;
+      return hostname === "calendly.com" || hostname.endsWith(".calendly.com");
+    } catch {
+      return false;
+    }
+  }, [bookingUrl]);
 
   useEffect(() => {
     return () => {
@@ -299,7 +383,7 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
   }, []);
 
   useEffect(() => {
-    if (status !== "success" || !calendlyRef.current) return;
+    if (status !== "success" || !usesCalendly || !calendlyRef.current) return;
 
     const parentElement = calendlyRef.current;
     const initCalendly = () => {
@@ -314,7 +398,7 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
         });
       }
       window.Calendly.initInlineWidget({
-        url: calendlyUrl,
+        url: bookingUrl,
         parentElement
       });
     };
@@ -338,24 +422,9 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
     document.body.appendChild(script);
 
     return () => script.removeEventListener("load", initCalendly);
-  }, [status]);
+  }, [bookingUrl, status, usesCalendly]);
 
   useEffect(() => {
-    const onMessage = (event: MessageEvent) => {
-      try {
-        const hostname = new URL(event.origin).hostname;
-        if (hostname !== "calendly.com" && !hostname.endsWith(".calendly.com")) return;
-      } catch {
-        return;
-      }
-      if (event.data?.event !== "calendly.event_scheduled" || bookingCompletedRef.current) return;
-      bookingCompletedRef.current = true;
-      captureFunnelEvent("booking_completed", {
-        provider: "calendly",
-        lead_id: leadIdRef.current || undefined
-      });
-    };
-
     const onPageHide = () => {
       if (!formStartedTrackedRef.current || submittedRef.current || abandonmentTrackedRef.current) return;
       abandonmentTrackedRef.current = true;
@@ -368,11 +437,9 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
       });
     };
 
-    window.addEventListener("message", onMessage);
     window.addEventListener("pagehide", onPageHide);
     window.addEventListener("beforeunload", onPageHide);
     return () => {
-      window.removeEventListener("message", onMessage);
       window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener("beforeunload", onPageHide);
     };
@@ -393,6 +460,16 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
   }, [currentStep, status, step.key]);
 
   useEffect(() => {
+    if (!formStartedTrackedRef.current) return;
+    stepTitleRef.current?.focus({ preventScroll: true });
+  }, [currentStep]);
+
+  useEffect(() => {
+    if (status !== "success") return;
+    bookingHeadingRef.current?.focus({ preventScroll: true });
+  }, [status]);
+
+  useEffect(() => {
     if (!formRef.current || formViewedRef.current) return;
 
     const observer = new IntersectionObserver(
@@ -407,33 +484,6 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
 
     observer.observe(formRef.current);
     return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const observers: IntersectionObserver[] = [];
-    const observeReveal = (
-      element: Element | null,
-      reveal: () => void,
-      threshold: number,
-      rootMargin = "0px 0px -8%"
-    ) => {
-      if (!element) return;
-      const observer = new IntersectionObserver(
-        ([entry]) => {
-          if (!entry.isIntersecting) return;
-          reveal();
-          observer.disconnect();
-        },
-        { threshold, rootMargin }
-      );
-      observer.observe(element);
-      observers.push(observer);
-    };
-
-    observeReveal(winsRef.current, () => setWinsVisible(true), 0.16);
-    observeReveal(finalCtaRef.current, () => setFinalCtaVisible(true), 0.4, "0px");
-
-    return () => observers.forEach((observer) => observer.disconnect());
   }, []);
 
   function markFormStarted() {
@@ -505,10 +555,14 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
 
     if (choiceTimerRef.current) window.clearTimeout(choiceTimerRef.current);
     if (currentStep === steps.length - 1) return;
+    if (settings.autoAdvanceDelayMs === 0) return;
 
     choiceTimerRef.current = window.setTimeout(
-      () => advance(nextAnswers),
-      settings.autoAdvanceDelayMs
+      () => {
+        choiceTimerRef.current = null;
+        advance(nextAnswers);
+      },
+      Math.max(450, settings.autoAdvanceDelayMs)
     );
   }
 
@@ -521,6 +575,10 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
 
   function advance(nextAnswers: Answers = answers) {
     if (status === "submitting" || status === "success") return;
+    if (choiceTimerRef.current) {
+      window.clearTimeout(choiceTimerRef.current);
+      choiceTimerRef.current = null;
+    }
     markFormStarted();
 
     if (!validStep(currentStep, nextAnswers)) {
@@ -545,6 +603,10 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
 
   function goBack() {
     if (status === "submitting" || currentStep === 0) return;
+    if (choiceTimerRef.current) {
+      window.clearTimeout(choiceTimerRef.current);
+      choiceTimerRef.current = null;
+    }
     captureFunnelEvent("form_back_clicked", {
       from_step_number: currentStep + 1,
       from_step_key: step.key
@@ -555,6 +617,8 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
   }
 
   async function submit(nextAnswers: Answers) {
+    if (submissionInFlightRef.current || submittedRef.current) return;
+    submissionInFlightRef.current = true;
     // eslint-disable-next-line react-hooks/purity -- Submission is triggered by an event handler.
     const duration = formStartedAtRef.current ? Date.now() - formStartedAtRef.current : 0;
     setStatus("submitting");
@@ -562,6 +626,9 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
       total_steps: steps.length,
       elapsed_ms: duration
     });
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 15_000);
 
     try {
       const response = await fetch("/api/waitlist", {
@@ -578,7 +645,8 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
             posthog_distinct_id: getPosthogDistinctId(),
             form_duration_ms: duration
           }
-        })
+        }),
+        signal: controller.signal
       });
 
       const result = (await response.json()) as { ok?: boolean; leadId?: string; message?: string };
@@ -600,6 +668,9 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
         total_steps: steps.length,
         failure_type: error instanceof TypeError ? "network" : "server"
       });
+    } finally {
+      window.clearTimeout(timeout);
+      if (!submittedRef.current) submissionInFlightRef.current = false;
     }
   }
 
@@ -614,40 +685,112 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
       button_label: settings.ctaLabel
     });
     document.querySelector("#waitlist")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    applicationTitleRef.current?.focus({ preventScroll: true });
+  }
+
+  function openAnalyticsSettings() {
+    window.dispatchEvent(new Event("analytics-preferences-open"));
   }
 
   return (
     <>
       <CinematicCurtain />
 
-      <main style={{ "--green": settings.accentColor } as CSSProperties}>
+      <a className="skip-link" href="#main-content">Skip to main content</a>
+
+      <header className="site-header" style={themeStyle}>
+        <Link className="brand-link" href="/" aria-label="Authentic Resell home">
+          <span className="brand-mark" aria-hidden="true">AR</span>
+          <span className="brand-name">Authentic Resell</span>
+        </Link>
+        <nav className="site-nav" aria-label="Primary navigation">
+          <a href="#program">How it works</a>
+          <a href={proofTarget}>Member stories</a>
+          <button type="button" onClick={() => scrollToForm("header")}>Apply now</button>
+        </nav>
+      </header>
+
+      <main id="main-content" style={themeStyle} tabIndex={-1}>
         <section className="hero" aria-labelledby="hero-title">
+          <p className="hero-eyebrow"><span /> Private reselling mentorship</p>
           <h1
             id="hero-title"
-            className={`main-title${settings.heroHeadline === brandedHeroHeadline ? " branded-main-title" : ""}`}
+            className={`main-title${structuredHeadline ? " branded-main-title" : ""}`}
           >
-            {settings.heroHeadline === brandedHeroHeadline ? (
+            {structuredHeadline ? (
               <>
-                <span className="hero-title-line hero-title-lead">
-                  See How Regular<span className="mobile-title-break"><br /></span> People Are
-                </span>
-                <span className="hero-title-line hero-title-accent">
-                  Building<span className="mobile-title-break"><br /></span> $5K-$30K/Month
-                </span>
-                <span className="hero-title-line hero-title-close">
-                  High-Ticket<span className="mobile-title-break"><br /></span> Reselling
-                  <span className="mobile-title-break"><br /></span> Businesses
-                </span>
+                <span className="hero-title-line hero-title-lead">Build a More Structured</span>
+                <span className="hero-title-line hero-title-accent">High-Ticket Reselling</span>
+                <span className="hero-title-line hero-title-close">Business</span>
               </>
             ) : (
               settings.heroHeadline
             )}
           </h1>
-          <h2 className="gradient-title waitlist-title">{settings.waitlistHeading}</h2>
+          <p className="hero-copy">{settings.heroBody.trim() || fallbackHeroBody}</p>
+          <div className="hero-actions">
+            <button className="cta-button" type="button" onClick={() => scrollToForm("hero")}>
+              {settings.ctaLabel}
+              <ArrowRight size={19} aria-hidden="true" />
+            </button>
+            <a className="text-link" href="#stories">See member stories</a>
+          </div>
+          <div className="hero-trust" aria-label="Program highlights">
+            <span><Check size={16} aria-hidden="true" /> 7-step application</span>
+            <span><Check size={16} aria-hidden="true" /> Scheduling after submission</span>
+            <span><Check size={16} aria-hidden="true" /> No income guarantees</span>
+          </div>
         </section>
 
-        <section id="waitlist" className="form-section" aria-label="Apply now">
-          <form className="waitlist-card" ref={formRef} onSubmit={handleSubmit} noValidate>
+        <section id="program" className="program-section" aria-labelledby="program-title">
+          <div className="section-heading">
+            <p className="section-eyebrow">A practical operating system</p>
+            <h2 id="program-title">A clearer path from first product to repeatable process.</h2>
+            <p>Build the fundamentals, make better decisions, and use coaching to keep moving.</p>
+          </div>
+          <div className="program-grid">
+            {programPillars.map((pillar) => {
+              const Icon = pillar.icon;
+              return (
+                <article className="program-card" key={pillar.number}>
+                  <div className="program-card-top">
+                    <span>{pillar.number}</span>
+                    <Icon size={21} aria-hidden="true" />
+                  </div>
+                  <h3>{pillar.title}</h3>
+                  <p>{pillar.copy}</p>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+
+        <section id="waitlist" className="form-section" aria-labelledby="application-title">
+          <div className="form-intro">
+            <p className="section-eyebrow">Your next step</p>
+            <h2
+              id="application-title"
+              className="gradient-title waitlist-title"
+              ref={applicationTitleRef}
+              tabIndex={-1}
+            >
+              {settings.waitlistHeading}
+            </h2>
+            <p>Tell us where you are now and what you want to build. You can choose a call time after submitting.</p>
+            <div className="form-meta" aria-label="Application details">
+              <span><Clock3 size={16} aria-hidden="true" /> 7 short steps</span>
+              <span><CalendarCheck2 size={16} aria-hidden="true" /> Scheduling comes next</span>
+              <span><ShieldCheck size={16} aria-hidden="true" /> Optional analytics</span>
+            </div>
+          </div>
+
+          <form
+            className="waitlist-card"
+            ref={formRef}
+            onSubmit={handleSubmit}
+            noValidate
+            aria-busy={status === "submitting"}
+          >
             <input
               ref={honeypotRef}
               className="honeypot"
@@ -668,67 +811,98 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
                 <div className="booking-panel">
                   <div className="booking-copy">
                     <span className="step-number">8</span>
-                    <h3>Application received. Choose your call time.</h3>
+                    <h3 ref={bookingHeadingRef} tabIndex={-1}>
+                      Application received. Choose your call time.
+                    </h3>
                     <p>Pick a slot you can 100% commit to.</p>
                   </div>
-                  <div className="calendly-card" ref={calendlyRef}>
-                    <div className="calendly-loading">Loading calendar...</div>
-                  </div>
+                  {usesCalendly ? (
+                    <>
+                      <div className="calendly-card" ref={calendlyRef}>
+                        <div className="calendly-loading">Loading calendar...</div>
+                      </div>
+                      <a className="booking-fallback" href={bookingUrl} target="_blank" rel="noreferrer">
+                        Calendar not loading? Open the scheduler
+                        <ArrowRight size={17} aria-hidden="true" />
+                      </a>
+                    </>
+                  ) : (
+                    <a className="direct-booking-link" href={bookingUrl} target="_blank" rel="noreferrer">
+                      {settings.bookingCtaLabel}
+                      <ArrowRight size={18} aria-hidden="true" />
+                    </a>
+                  )}
                 </div>
               ) : (
                 <div className="step-content" key={step.key}>
                   <span className="step-number">{currentStep + 1}</span>
-                  <h3 className="step-title">{step.title}</h3>
+                  <h3 className="step-title" ref={stepTitleRef} tabIndex={-1}>{step.title}</h3>
                   {step.subtitle ? <p className="step-subtitle">{step.subtitle}</p> : null}
 
                   <div className="field-stack">
                     {step.fields.map((field) => {
                       if (field.type === "button-group") {
                         return (
-                          <div className="choice-list" key={field.id}>
+                          <fieldset className="choice-list" key={field.id}>
+                            <legend className="sr-only">{step.title}</legend>
                             {field.options.map(([letter, label]) => (
-                              <button
+                              <label
                                 className={`choice-button${answers[field.id] === label ? " selected" : ""}`}
                                 key={label}
-                                type="button"
-                                disabled={status === "submitting"}
-                                onClick={() => choose(field.id, label)}
                               >
+                                <input
+                                  className="sr-only choice-input"
+                                  type="radio"
+                                  name={field.id}
+                                  value={label}
+                                  checked={answers[field.id] === label}
+                                  disabled={status === "submitting"}
+                                  onChange={() => choose(field.id, label)}
+                                />
                                 <span className="choice-key">{letter}</span>
-                                <span className="choice-label">{label}</span>
-                              </button>
+                                <span className="choice-label">
+                                  {field.id === "call_commitment" && label === "Yes"
+                                    ? "Yes — I’ll choose a time I can attend"
+                                    : label}
+                                </span>
+                              </label>
                             ))}
-                          </div>
+                          </fieldset>
                         );
                       }
 
                       if (field.id === "phone_number") {
                         return (
-                          <PhoneInput
-                            className="phone-field"
-                            key={field.id}
-                            defaultCountry="us"
-                            forceDialCode
-                            value={answers[field.id]}
-                            disabled={status === "submitting"}
-                            inputProps={{
-                              "aria-label": "Phone number",
-                              autoComplete: field.autocomplete,
-                              onFocus: () => trackFieldFocused(field.id, "tel"),
-                              onBlur: () =>
-                                trackFieldCompleted(
-                                  field.id,
-                                  "tel",
-                                  answers[field.id].replace(/\D/g, "").length >= 7
-                                )
-                            }}
-                            onChange={(phone) => updateAnswer(field.id, phone)}
-                          />
+                          <div className="optional-field" key={field.id}>
+                            <label className="field-label" htmlFor={field.id}>{fieldLabels[field.id]}</label>
+                            <PhoneInput
+                              className="phone-field"
+                              defaultCountry="us"
+                              forceDialCode
+                              value={answers[field.id]}
+                              disabled={status === "submitting"}
+                              inputProps={{
+                                id: field.id,
+                                name: field.id,
+                                "aria-label": "Phone number",
+                                autoComplete: field.autocomplete,
+                                onFocus: () => trackFieldFocused(field.id, "tel"),
+                                onBlur: () =>
+                                  trackFieldCompleted(
+                                    field.id,
+                                    "tel",
+                                    answers[field.id].replace(/\D/g, "").length >= 7
+                                  )
+                              }}
+                              onChange={(phone) => updateAnswer(field.id, phone)}
+                            />
+                          </div>
                         );
                       }
 
                       return (
                         <div className="optional-field" key={field.id}>
+                          <label className="field-label" htmlFor={field.id}>{fieldLabels[field.id]}</label>
                           <input
                             className="text-field"
                             id={field.id}
@@ -752,9 +926,7 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
 
                   {validationVisible ? (
                     <p className="form-message validation-message" role="alert">
-                      {step.key === "call-commitment"
-                        ? "Only continue if you can 100% commit to the call time."
-                        : "Complete this step before continuing."}
+                      {validationMessage(currentStep, answers)}
                     </p>
                   ) : null}
 
@@ -790,31 +962,39 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
                         : currentStep === steps.length - 1
                           ? status === "error"
                             ? "Try Again"
-                            : "OK"
-                          : "OK"}
+                            : "Submit application"
+                          : "Continue"}
                     </span>
                     <ArrowRight size={19} aria-hidden="true" />
                   </button>
                 </div>
 
                 <div className="progress-dots" aria-label={`Step ${currentStep + 1} of ${steps.length}`}>
+                  <span className="sr-only">Step {currentStep + 1} of {steps.length}</span>
                   {steps.map((item, index) => (
-                    <span className={index === currentStep ? "active" : ""} key={item.key} />
+                    <span aria-hidden="true" className={index === currentStep ? "active" : ""} key={item.key} />
                   ))}
                 </div>
               </>
             ) : null}
           </form>
+          <p className="form-disclosure">
+            By submitting, you agree that Authentic Resell may use these details to review and follow up on your application. Usage analytics are optional and never include your contact details or answers. Read the <Link href="/privacy">privacy notice</Link>.
+          </p>
         </section>
 
         {settings.showWins ? (
           <section
-            ref={winsRef}
-            className={`wins reveal-target${winsVisible ? " is-visible" : ""}`}
+            id="results"
+            className="wins"
             aria-labelledby="wins-title"
           >
-            <h2 id="wins-title">More Inner Circle Wins:</h2>
-            <div className="wins-masonry">
+            <div className="section-heading">
+              <p className="section-eyebrow">Member proof</p>
+              <h2 id="wins-title">Progress shared by Inner Circle members.</h2>
+              <p>Real screenshots from individual members. Every result is different, and future earnings are never guaranteed.</p>
+            </div>
+            <div className="wins-masonry" id="member-wins-grid">
               {localWinImages.map((win, index) => (
                 <span
                   className="win-image win-image-local"
@@ -832,7 +1012,7 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
                   <span className="win-time-mask" style={win.timestampMask} aria-hidden="true" />
                 </span>
               ))}
-              {winImages.map(([id, width, height], index) => (
+              {visibleWinImages.map(([id, width, height], index) => (
                 <span
                   className="win-image"
                   key={`${id}-${index}`}
@@ -857,7 +1037,7 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
                       src={`https://cdn.clyro.io/images/variants/${id}/640.webp`}
                       width={width}
                       height={height}
-                      alt={`Inner Circle result ${index + 1}`}
+                      alt=""
                       loading="lazy"
                       decoding="async"
                       fetchPriority="low"
@@ -866,18 +1046,78 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
                 </span>
               ))}
             </div>
+            <div className="proof-actions">
+              <button
+                className="secondary-cta"
+                type="button"
+                aria-controls="member-wins-grid"
+                aria-expanded={showAllWins}
+                onClick={() => setShowAllWins((visible) => !visible)}
+              >
+                {showAllWins ? "Show fewer member wins" : "View more member wins"}
+              </button>
+            </div>
           </section>
         ) : null}
 
-        <div
-          ref={finalCtaRef}
-          className={`button-wrap final-cta reveal-target${finalCtaVisible ? " is-visible" : ""}`}
-        >
+        <section id="stories" className="interviews" aria-labelledby="stories-title">
+          <div className="section-heading">
+            <p className="section-eyebrow">Long-form stories</p>
+            <h2 id="stories-title">Hear how members built their operations.</h2>
+            <p>Open a story to hear the process, decisions, and work behind the headline.</p>
+          </div>
+          <TestimonialGrid
+            limit={3}
+            onPlay={(videoId) => captureFunnelEvent("testimonial_video_opened", { video_id: videoId, source: "member_stories" })}
+          />
+        </section>
+
+        <section className="faq-section" aria-labelledby="faq-title">
+          <div className="section-heading">
+            <p className="section-eyebrow">Before you apply</p>
+            <h2 id="faq-title">Frequently asked questions.</h2>
+          </div>
+          <div className="faq-list">
+            {frequentlyAskedQuestions.map((item) => (
+              <details key={item.question}>
+                <summary>{item.question}<span aria-hidden="true">+</span></summary>
+                <p>{item.answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+
+        <section className="button-wrap final-cta">
+          <p className="section-eyebrow">Ready to take the next step?</p>
+          <h2>Start with a focused conversation.</h2>
+          <p>Complete the short application and choose a time that works for you.</p>
           <button className="cta-button" type="button" onClick={() => scrollToForm("page_end")}>
             {settings.ctaLabel}
+            <ArrowRight size={19} aria-hidden="true" />
           </button>
-        </div>
+        </section>
       </main>
+
+      <footer className="site-footer" style={themeStyle}>
+        <div>
+          <Link className="brand-link" href="/" aria-label="Authentic Resell home">
+            <span className="brand-mark" aria-hidden="true">AR</span>
+            <span className="brand-name">Authentic Resell</span>
+          </Link>
+          <p>Private guidance for building a more structured reselling operation.</p>
+        </div>
+        <div className="footer-links">
+          <a href="#program">How it works</a>
+          <a href={proofTarget}>Member stories</a>
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/terms">Terms</Link>
+          <button type="button" onClick={openAnalyticsSettings}>Privacy choices</button>
+          <button type="button" onClick={() => scrollToForm("footer")}>Apply now</button>
+        </div>
+        <p className="earnings-disclaimer">
+          Member examples are illustrative and do not guarantee income or business results. © {new Date().getFullYear()} Authentic Resell.
+        </p>
+      </footer>
 
     </>
   );

@@ -1,5 +1,7 @@
 import { verifyCalendlyWebhook } from "@/lib/calendly/webhook";
+import { readBoundedText } from "@/lib/api-security";
 import { sendBookingEmail } from "@/lib/gmail/booking-email";
+import { consumeRateLimit } from "@/lib/rate-limit";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -9,7 +11,10 @@ export const runtime = "nodejs";
 const webhookSchema = z.object({
   event: z.string(),
   payload: z.object({
-    uri: z.url(),
+    uri: z.url().refine((value) => {
+      const url = new URL(value);
+      return url.protocol === "https:" && url.hostname === "api.calendly.com";
+    }),
     email: z.email(),
     name: z.string().trim().min(1).max(200),
     scheduled_event: z.object({
@@ -33,7 +38,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "Webhook is not configured." }, { status: 503 });
   }
 
-  const rawBody = await request.text();
+  if (request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() !== "application/json") {
+    return NextResponse.json({ ok: false, message: "Unsupported content type." }, { status: 415 });
+  }
+
+  const rateLimit = await consumeRateLimit({
+    request,
+    scope: "calendly_webhook",
+    limit: 180,
+    windowSeconds: 60
+  });
+  if (!rateLimit.available) {
+    return NextResponse.json(
+      { ok: false, message: "Webhook processing is temporarily unavailable." },
+      { status: 503, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } }
+    );
+  }
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { ok: false, message: "Too many requests." },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } }
+    );
+  }
+
+  const body = await readBoundedText(request, 64 * 1024);
+  if (!body.ok) {
+    return NextResponse.json(
+      { ok: false, message: body.error === "payload_too_large" ? "Payload is too large." : "Invalid payload." },
+      { status: body.error === "payload_too_large" ? 413 : 400 }
+    );
+  }
+  const rawBody = body.value;
   if (!verifyCalendlyWebhook(rawBody, request.headers.get("calendly-webhook-signature"), signingKey)) {
     return NextResponse.json({ ok: false, message: "Invalid signature." }, { status: 401 });
   }
