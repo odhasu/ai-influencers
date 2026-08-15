@@ -1,9 +1,7 @@
 import { captureServerEvent } from "@/lib/posthog/server";
-import { isSameOriginBrowserRequest, readBoundedJson } from "@/lib/api-security";
-import { getPublicFunnelSettings } from "@/lib/funnel-settings";
-import { consumeRateLimit } from "@/lib/rate-limit";
+import { getFunnelSettings } from "@/lib/funnel-settings";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
-import { after, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -22,7 +20,7 @@ const answersSchema = z.object({
     "Build a brand on social media",
     "Bulk supplying to stores"
   ]),
-  age_range: z.enum(["18 - 23", "24 - 35", "35+"]),
+  age_range: z.enum(["13 - 17", "18 - 23", "24 - 35", "35+"]),
   instagram: z.string().trim().max(100).default(""),
   email: z.email().trim().max(254),
   full_name: z.string().trim().min(2).max(120),
@@ -31,10 +29,7 @@ const answersSchema = z.object({
     .trim()
     .min(7)
     .max(40)
-    .refine((value) => {
-      const digits = value.replace(/\D/g, "");
-      return digits.length >= 7 && digits.length <= 15;
-    }),
+    .refine((value) => value.replace(/\D/g, "").length >= 7),
   budget_range: z.enum([
     "Under $200 USD",
     "$200 - $500 USD",
@@ -126,91 +121,26 @@ function normalizeInstagram(value: string) {
   return trimmed && trimmed !== "not_provided" ? trimmed : "not_provided";
 }
 
-function json(
-  body: Record<string, unknown>,
-  init: { status?: number; headers?: Record<string, string> } = {}
-) {
-  return NextResponse.json(body, {
-    status: init.status,
-    headers: {
-      "Cache-Control": "private, no-store, max-age=0",
-      ...init.headers
-    }
-  });
-}
-
 export async function POST(request: Request) {
-  if (!isSameOriginBrowserRequest(request)) {
-    return json({ ok: false, message: "This request could not be verified." }, { status: 403 });
-  }
+  let parsed: z.infer<typeof requestSchema>;
 
-  const rateLimit = await consumeRateLimit({
-    request,
-    scope: "waitlist_submit",
-    limit: 8,
-    windowSeconds: 10 * 60
-  });
-  if (!rateLimit.available) {
-    return json(
-      { ok: false, message: "Applications are temporarily unavailable. Please try again shortly." },
-      { status: 503, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } }
-    );
-  }
-  if (!rateLimit.allowed) {
-    return json(
-      { ok: false, message: "Too many attempts. Please wait before trying again." },
-      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } }
-    );
-  }
-
-  const body = await readBoundedJson(request, 48 * 1024);
-  if (!body.ok) {
-    const status = body.error === "unsupported_media_type" ? 415 : body.error === "payload_too_large" ? 413 : 400;
-    return json(
-      { ok: false, message: "Please check the application details and try again." },
-      { status }
-    );
-  }
-
-  const result = requestSchema.safeParse(body.value);
-  if (!result.success) {
-    return json(
+  try {
+    parsed = requestSchema.parse(await request.json());
+  } catch {
+    return NextResponse.json(
       { ok: false, message: "Please check the application details and try again." },
       { status: 400 }
     );
   }
-  const parsed: z.infer<typeof requestSchema> = result.data;
 
   if (parsed.website) {
-    return json({ ok: true, leadId: crypto.randomUUID() });
+    return NextResponse.json({ ok: true, leadId: crypto.randomUUID() });
   }
 
   const { answers, metadata } = parsed;
   const { attribution } = metadata;
   const { first_touch: firstTouch, last_touch: lastTouch } = attribution;
   const instagram = normalizeInstagram(answers.instagram);
-  const normalizedPhone = `+${answers.phone_number.replace(/\D/g, "")}`;
-  const normalizedEmail = answers.email.toLowerCase();
-
-  const emailRateLimit = await consumeRateLimit({
-    request,
-    scope: "waitlist_email",
-    identifier: normalizedEmail,
-    limit: 3,
-    windowSeconds: 60 * 60
-  });
-  if (!emailRateLimit.available) {
-    return json(
-      { ok: false, message: "Applications are temporarily unavailable. Please try again shortly." },
-      { status: 503, headers: { "Retry-After": String(emailRateLimit.retryAfterSeconds) } }
-    );
-  }
-  if (!emailRateLimit.allowed) {
-    return json(
-      { ok: false, message: "This application was recently submitted. Please try again later." },
-      { status: 429, headers: { "Retry-After": String(emailRateLimit.retryAfterSeconds) } }
-    );
-  }
 
   try {
     const supabase = createSupabaseAdmin();
@@ -239,26 +169,27 @@ export async function POST(request: Request) {
         .map((key) => [key, lastTouch[key as keyof typeof lastTouch]])
         .filter(([, value]) => value)
     );
-    const { data: existingLead, error: existingLeadError } = await supabase
+    const normalizedEmail = answers.email.toLowerCase();
+    const { data: existingLead } = await supabase
       .from("waitlist_applications")
       .select("id,first_touch")
       .eq("email", normalizedEmail)
       .maybeSingle();
-    if (existingLeadError) throw existingLeadError;
-
     const preservedFirstTouch =
       existingLead?.first_touch && Object.keys(existingLead.first_touch as Record<string, unknown>).length
         ? existingLead.first_touch
         : firstTouch;
 
-    const leadInput = {
+    const { data, error } = await supabase
+      .from("waitlist_applications")
+      .upsert({
         reselling_experience: answers.reselling_experience,
         long_term_goal: answers.long_term_goal,
         age_range: answers.age_range,
         instagram,
         email: normalizedEmail,
         full_name: answers.full_name,
-        phone_number: normalizedPhone,
+        phone_number: answers.phone_number,
         budget_range: answers.budget_range,
         session_id: metadata.session_id,
         visitor_id: metadata.visitor_id || null,
@@ -289,53 +220,51 @@ export async function POST(request: Request) {
         country: safeHeader(request.headers, "x-vercel-ip-country", 8) || null,
         region: decodedHeader(request.headers, "x-vercel-ip-country-region", 80) || null,
         city: decodedHeader(request.headers, "x-vercel-ip-city", 160) || null
-      };
+      }, { onConflict: "email" })
+      .select("id")
+      .single();
 
-    let lead: { id: string } | null = existingLead ? { id: existingLead.id } : null;
-    let isNewLead = false;
-
-    if (!lead) {
-      const { data: insertedLead, error: insertError } = await supabase
-        .from("waitlist_applications")
-        .insert(leadInput)
-        .select("id")
-        .single();
-
-      if (insertError?.code === "23505") {
-        const { data: concurrentLead, error: concurrentLeadError } = await supabase
-          .from("waitlist_applications")
-          .select("id")
-          .eq("email", normalizedEmail)
-          .maybeSingle();
-        if (concurrentLeadError || !concurrentLead) throw concurrentLeadError ?? insertError;
-        lead = concurrentLead;
-      } else if (insertError || !insertedLead) {
-        console.error("waitlist_insert_failed", {
-          code: insertError?.code ?? "missing_data",
-          message: insertError?.message ?? "No record returned"
-        });
-        return json(
-          { ok: false, message: "The application could not be saved right now." },
-          { status: 503 }
-        );
-      } else {
-        lead = insertedLead;
-        isNewLead = true;
-      }
+    if (error || !data) {
+      console.error("waitlist_insert_failed", {
+        code: error?.code ?? "missing_data",
+        message: error?.message ?? "No record returned"
+      });
+      return NextResponse.json(
+        { ok: false, message: "The application could not be saved right now." },
+        { status: 503 }
+      );
     }
 
-    const leadId = lead.id;
-    const requestUserAgent = safeHeader(request.headers, "user-agent", 500);
+    if (metadata.analytics_consent) {
+      await captureServerEvent({
+        distinctId: metadata.posthog_distinct_id || data.id,
+        event: "form_submit_succeeded",
+        properties: {
+          lead_id: data.id,
+          total_steps: 7,
+          elapsed_ms: metadata.form_duration_ms,
+          utm_source: resolvedAttribution.utm_source,
+          utm_medium: resolvedAttribution.utm_medium,
+          utm_campaign: resolvedAttribution.utm_campaign,
+          referral_code: resolvedAttribution.referral_code,
+          visitor_id: metadata.visitor_id || null,
+          session_number: metadata.session_number,
+          first_touch_utm_source: firstTouch.utm_source || null,
+          last_touch_utm_source: resolvedAttribution.utm_source,
+          source: "server"
+        }
+      });
+    }
 
-    after(async () => {
-      const operationalTasks: Array<PromiseLike<unknown>> = [
-        supabase.from("funnel_events").insert({
+    const settings = await getFunnelSettings(supabase);
+    const operationalTasks: Array<PromiseLike<unknown>> = [
+      supabase.from("funnel_events").insert({
         event_name: "form_submit_succeeded",
         event_client_at: new Date().toISOString(),
         session_id: metadata.session_id,
         visitor_id: metadata.visitor_id || null,
         pageview_id: metadata.pageview_id || null,
-        lead_id: leadId,
+        lead_id: data.id,
         elapsed_ms: metadata.form_duration_ms,
         utm_source: resolvedAttribution.utm_source,
         utm_medium: resolvedAttribution.utm_medium,
@@ -350,83 +279,52 @@ export async function POST(request: Request) {
         first_touch: preservedFirstTouch,
         last_touch: lastTouch,
         click_ids: clickIds,
-        device_type: /mobile|iphone|android/i.test(requestUserAgent)
+        device_type: /mobile|iphone|android/i.test(safeHeader(request.headers, "user-agent", 500))
           ? "mobile"
           : "desktop",
-        metadata: {
-          source: "server",
-          session_number: metadata.session_number,
-          submission_type: isNewLead ? "new" : "duplicate"
-        }
+        metadata: { source: "server", session_number: metadata.session_number }
       })
-      ];
+    ];
 
-      if (metadata.analytics_consent) {
-        operationalTasks.push(
-          captureServerEvent({
-            distinctId: metadata.posthog_distinct_id || leadId,
-            event: "form_submit_succeeded",
-            properties: {
-              lead_id: leadId,
-              total_steps: 7,
-              elapsed_ms: metadata.form_duration_ms,
-              utm_source: resolvedAttribution.utm_source,
-              utm_medium: resolvedAttribution.utm_medium,
-              utm_campaign: resolvedAttribution.utm_campaign,
-              referral_code: resolvedAttribution.referral_code,
-              visitor_id: metadata.visitor_id || null,
-              session_number: metadata.session_number,
-              first_touch_utm_source: firstTouch.utm_source || null,
-              last_touch_utm_source: resolvedAttribution.utm_source,
-              source: "server"
-            }
-          })
-        );
-      }
+    if (metadata.visitor_id) {
+      operationalTasks.push(
+        supabase.from("lead_visitor_links").upsert(
+          {
+            lead_id: data.id,
+            visitor_id: metadata.visitor_id,
+            last_linked_at: new Date().toISOString(),
+            last_session_id: metadata.session_id
+          },
+          { onConflict: "lead_id,visitor_id" }
+        )
+      );
+    }
 
-      if (metadata.visitor_id) {
-        operationalTasks.push(
-          supabase.from("lead_visitor_links").upsert(
-            {
-              lead_id: leadId,
-              visitor_id: metadata.visitor_id,
-              last_linked_at: new Date().toISOString(),
-              last_session_id: metadata.session_id
-            },
-            { onConflict: "lead_id,visitor_id" }
-          )
-        );
-      }
+    if (settings.webhookEnabled && process.env.LEAD_WEBHOOK_URL) {
+      operationalTasks.push(
+        sendLeadWebhook({
+          event: "waitlist_application_created",
+          lead_id: data.id,
+          created_at: new Date().toISOString(),
+          answers: { ...answers, instagram },
+          attribution: {
+            first_touch: preservedFirstTouch,
+            last_touch: lastTouch,
+            click_ids: clickIds,
+            ...resolvedAttribution
+          }
+        })
+      );
+    }
 
-      if (isNewLead && process.env.LEAD_WEBHOOK_URL) {
-        const settings = await getPublicFunnelSettings();
-        if (settings.webhookEnabled) {
-          operationalTasks.push(
-            sendLeadWebhook({
-              event: "waitlist_application_created",
-              lead_id: leadId,
-              created_at: new Date().toISOString(),
-              answers: { ...answers, instagram, phone_number: normalizedPhone },
-              attribution: {
-                first_touch: preservedFirstTouch,
-                last_touch: lastTouch,
-                click_ids: clickIds,
-                ...resolvedAttribution
-              }
-            })
-          );
-        }
-      }
+    await Promise.allSettled(operationalTasks);
 
-      await Promise.allSettled(operationalTasks);
-    });
-
-    return json({ ok: true, leadId });
+    return NextResponse.json({ ok: true, leadId: data.id });
   } catch (error) {
     console.error("waitlist_request_failed", {
       message: error instanceof Error ? error.message : "Unknown server error"
     });
-    return json(
+    return NextResponse.json(
       { ok: false, message: "The application could not be saved right now." },
       { status: 503 }
     );

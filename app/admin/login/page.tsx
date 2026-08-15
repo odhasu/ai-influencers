@@ -11,9 +11,9 @@ export default async function AdminLoginPage() {
   return (
     <main className={styles.page}>
       <section className={styles.card}>
-        <div className={styles.mark}>AR</div>
+        <div className={styles.mark}>LR</div>
         <p className={styles.eyebrow}>Funnel operations</p>
-        <h1>Sign in to Authentic Resell</h1>
+        <h1>Sign in to your dashboard</h1>
         <p className={styles.copy}>Manage leads, conversion data, follow-ups, and funnel settings.</p>
         <AdminLoginForm configured={isAdminConfigured()} />
       </section>

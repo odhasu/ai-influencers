@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import {
   analyticsConsentDecision,
   denyAnalyticsConsent,
@@ -18,12 +18,6 @@ export function AnalyticsConsent() {
   const decision = useSyncExternalStore(subscribe, analyticsConsentDecision, () => null);
   const [editing, setEditing] = useState(false);
 
-  useEffect(() => {
-    const openPreferences = () => setEditing(true);
-    window.addEventListener("analytics-preferences-open", openPreferences);
-    return () => window.removeEventListener("analytics-preferences-open", openPreferences);
-  }, []);
-
   if (pathname.startsWith("/dashboard") || pathname.startsWith("/admin")) {
     return null;
   }
@@ -39,7 +33,6 @@ export function AnalyticsConsent() {
   return (
     <aside className="analytics-consent" aria-label="Analytics preference">
       <span className="analytics-consent-title">Analytics preferences</span>
-      <p>Allow privacy-conscious usage analytics to help us improve the funnel. Contact details and application answers are never included in analytics events.</p>
       <div>
         <button
           className="consent-secondary"

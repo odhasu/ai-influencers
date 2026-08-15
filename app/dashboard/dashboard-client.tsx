@@ -34,7 +34,6 @@ import {
   Trash2,
   Users
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { DashboardEvent, DashboardLead, DashboardPayload, LeadStatus, ReferralLink } from "@/lib/dashboard-data";
 import type { FunnelSettings } from "@/lib/funnel-settings";
@@ -236,7 +235,6 @@ export function DashboardClient({
   initialPayload: DashboardPayload;
   developmentBypass: boolean;
 }) {
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [leads, setLeads] = useState(initialPayload.leads);
   const [referralLinks, setReferralLinks] = useState(initialPayload.referralLinks);
@@ -532,16 +530,16 @@ export function DashboardClient({
 
   async function logout() {
     await fetch("/api/admin/logout", { method: "POST" });
-    router.replace("/admin/login");
+    window.location.assign("/admin/login");
   }
 
   return (
     <div className={styles.app} data-private>
       <aside className={styles.sidebar}>
         <div className={styles.brand}>
-          <div className={styles.brandMark}>AR</div>
+          <div className={styles.brandMark}>LR</div>
           <div>
-            <strong>Authentic Resell</strong>
+            <strong>Funnel OS</strong>
             <span>{settings.campaignName}</span>
           </div>
         </div>
@@ -1360,7 +1358,7 @@ function SettingsTab({
             <SwitchRow title="Accept applications" description="Turn off to pause the form without taking the page down." checked={settings.formEnabled} onChange={(value) => set("formEnabled", value)} />
             <SwitchRow title="Show proof gallery" description="Display the Inner Circle wins masonry gallery." checked={settings.showWins} onChange={(value) => set("showWins", value)} />
           </div>
-          <div className={styles.settingsGridCompact}><label>Auto-advance delay (ms, 0 disables)<input type="number" min={0} max={2000} value={settings.autoAdvanceDelayMs} onChange={(event) => set("autoAdvanceDelayMs", Number(event.target.value))} /></label></div>
+          <div className={styles.settingsGridCompact}><label>Auto-advance delay (ms)<input type="number" min={0} max={2000} value={settings.autoAdvanceDelayMs} onChange={(event) => set("autoAdvanceDelayMs", Number(event.target.value))} /></label></div>
         </section>
 
         <section className={styles.settingsSection}>

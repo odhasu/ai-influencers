@@ -1,5 +1,4 @@
 import { isAdminAuthenticated } from "@/lib/admin-auth";
-import { isSameOriginBrowserRequest, readBoundedJson } from "@/lib/api-security";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -17,12 +16,7 @@ const referralLinkSchema = z
       .min(2)
       .max(80)
       .regex(/^[a-z0-9][a-z0-9-]*$/),
-    destinationPath: z
-      .string()
-      .trim()
-      .min(1)
-      .max(200)
-      .regex(/^\/(?!\/)[^\u0000-\u001f\u007f?#]*$/),
+    destinationPath: z.string().trim().min(1).max(200).startsWith("/"),
     notes: z.string().trim().max(1000),
     isActive: z.boolean(),
     utmSource: z.string().trim().max(160),
@@ -53,19 +47,11 @@ function toDatabase(input: z.infer<typeof referralLinkSchema>) {
 }
 
 export async function POST(request: Request) {
-  if (!isSameOriginBrowserRequest(request)) {
-    return NextResponse.json({ ok: false, message: "Forbidden." }, { status: 403 });
-  }
   if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ ok: false, message: "Unauthorized." }, { status: 401 });
   }
 
-  const body = await readBoundedJson(request, 12 * 1024);
-  if (!body.ok) {
-    const status = body.error === "unsupported_media_type" ? 415 : body.error === "payload_too_large" ? 413 : 400;
-    return NextResponse.json({ ok: false, message: "Invalid referral link payload." }, { status });
-  }
-  const parsed = referralLinkSchema.safeParse(body.value);
+  const parsed = referralLinkSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ ok: false, message: "Check the referral link fields." }, { status: 400 });
   }
@@ -96,19 +82,11 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (!isSameOriginBrowserRequest(request)) {
-    return NextResponse.json({ ok: false, message: "Forbidden." }, { status: 403 });
-  }
   if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ ok: false, message: "Unauthorized." }, { status: 401 });
   }
 
-  const body = await readBoundedJson(request, 2 * 1024);
-  if (!body.ok) {
-    const status = body.error === "unsupported_media_type" ? 415 : body.error === "payload_too_large" ? 413 : 400;
-    return NextResponse.json({ ok: false, message: "Invalid referral link ID." }, { status });
-  }
-  const parsed = deleteSchema.safeParse(body.value);
+  const parsed = deleteSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ ok: false, message: "Invalid referral link ID." }, { status: 400 });
   }

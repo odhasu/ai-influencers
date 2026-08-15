@@ -1,7 +1,9 @@
 import { WaitlistFunnel } from "@/components/waitlist-funnel";
-import { getPublicFunnelSettings } from "@/lib/funnel-settings";
+import { getFunnelSettings } from "@/lib/funnel-settings";
+
+export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const settings = await getPublicFunnelSettings();
+  const settings = await getFunnelSettings();
   return <WaitlistFunnel settings={settings} />;
 }

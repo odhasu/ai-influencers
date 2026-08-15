@@ -2,11 +2,9 @@
 
 import { FormEvent, useState } from "react";
 import { ArrowRight, LoaderCircle, LockKeyhole } from "lucide-react";
-import { useRouter } from "next/navigation";
 import styles from "./login.module.css";
 
 export function AdminLoginForm({ configured }: { configured: boolean }) {
-  const router = useRouter();
   const [password, setPassword] = useState("");
   const [rememberDevice, setRememberDevice] = useState(true);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -30,8 +28,7 @@ export function AdminLoginForm({ configured }: { configured: boolean }) {
       return;
     }
 
-    router.replace("/dashboard");
-    router.refresh();
+    window.location.assign("/dashboard");
   }
 
   if (!configured) {

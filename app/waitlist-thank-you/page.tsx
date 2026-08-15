@@ -1,35 +1,37 @@
 import type { Metadata } from "next";
-import { CalendarCheck2, Check, Eye, MessageCircle, PlayCircle } from "lucide-react";
+import { AlertTriangle, Check, Eye, MessageCircle, PlayCircle } from "lucide-react";
 import { OverviewVideo } from "@/components/overview-video";
 import { CinematicCurtain } from "@/components/cinematic-curtain";
-import { getPublicFunnelSettings } from "@/lib/funnel-settings";
+import { getFunnelSettings } from "@/lib/funnel-settings";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Application Received",
+  title: "You're on the Waitlist | Lucas Resells",
   description: "Your Inner Circle waitlist application has been received."
 };
 
 const nextSteps = [
   {
     icon: Eye,
-    title: "Watch for a follow-up",
-    body: "We may contact you using the details in your application. Keep an eye on your inbox and phone for the next step."
+    title: "Watch for a Call or Text",
+    body: "We may reach out by phone or text within the next couple of hours. Save our number and make sure your notifications are on so you don't miss the call."
   },
   {
     icon: MessageCircle,
-    title: "Review the details",
-    body: "Read any follow-up carefully and ask questions before making a decision. There is no guaranteed income or business outcome."
+    title: "Respond Right Away",
+    body: "If you've been selected, respond as soon as you hear from us. Spots are limited and they'll go to the next applicant if we can't get a hold of you."
   },
   {
     icon: PlayCircle,
-    title: "Watch the overview",
-    body: "Use this optional overview to prepare questions about the program and application process.",
+    title: "Watch This While You Wait",
+    body: "While you wait, watch this overview so you're ready to move fast if you get the call.",
     video: true
   }
 ] as const;
 
 export default async function WaitlistThankYouPage() {
-  const settings = await getPublicFunnelSettings();
+  const settings = await getFunnelSettings();
 
   return (
     <>
@@ -44,16 +46,16 @@ export default async function WaitlistThankYouPage() {
             You Just Applied to the Waitlist
           </h1>
           <p className="thank-you-copy">
-            Your application has been received. Review the next steps below and choose a call time if scheduling is available.
+            Lucas is only letting a select few applicants join the program early. Be on the lookout for a phone call or text within the next couple of hours - if you don&apos;t respond, you&apos;ll miss your opportunity.
           </p>
         </section>
 
         <section className="important-callout" aria-labelledby="important-title">
-          <CalendarCheck2 size={25} aria-hidden="true" />
+          <AlertTriangle size={25} aria-hidden="true" />
           <div>
-            <h2 id="important-title">What happens next</h2>
+            <h2 id="important-title">Important!</h2>
             <p>
-              We&apos;ll use the contact details you supplied to follow up about your application. You can ask questions before deciding whether to continue.
+              Keep your phone close and your notifications on. If we reach out and you don&apos;t respond, your spot will be given to someone else.
             </p>
           </div>
         </section>

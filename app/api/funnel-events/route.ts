@@ -1,5 +1,3 @@
-import { isSameOriginBrowserRequest, readBoundedJson } from "@/lib/api-security";
-import { consumeRateLimit } from "@/lib/rate-limit";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -27,6 +25,7 @@ const eventNameSchema = z.enum([
   "form_submit_started",
   "form_success_shown",
   "form_submit_failed",
+  "form_submit_succeeded",
   "testimonial_video_opened",
   "vsl_started",
   "vsl_played",
@@ -34,7 +33,11 @@ const eventNameSchema = z.enum([
   "vsl_watch_batch",
   "vsl_progress_reached",
   "vsl_completed",
-  "booking_started"
+  "booking_started",
+  "booking_completed",
+  "checkout_started",
+  "payment_succeeded",
+  "conversion_recorded"
 ]);
 
 const shortString = z.string().max(160);
@@ -76,6 +79,7 @@ const contextSchema = z.object({
 });
 
 const propertiesSchema = z.object({
+  lead_id: z.uuid().optional(),
   step_number: z.number().int().min(1).max(20).optional(),
   step_key: z.string().max(80).optional(),
   percent: z.number().int().min(0).max(100).optional(),
@@ -105,6 +109,9 @@ const propertiesSchema = z.object({
   video_duration_seconds: z.number().int().min(0).max(60 * 60 * 8).optional(),
   furthest_second: z.number().int().min(0).max(60 * 60 * 8).optional(),
   watched_seconds: z.array(z.number().int().min(0).max(60 * 60 * 8)).max(30).optional(),
+  value_cents: z.number().int().min(0).max(1_000_000_000).optional(),
+  currency: z.string().length(3).optional(),
+  external_id: z.string().max(200).optional(),
   source: z.string().max(80).optional()
 });
 
@@ -154,51 +161,23 @@ function deviceInfo(userAgent: string) {
   return { deviceType, browser, os };
 }
 
+function sameOrigin(request: Request) {
+  const origin = request.headers.get("origin");
+  if (!origin) return true;
+  try {
+    return new URL(origin).host === new URL(request.url).host;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: Request) {
-  if (!isSameOriginBrowserRequest(request)) {
-    return NextResponse.json({ ok: false, message: "Forbidden." }, { status: 403 });
-  }
-
-  const rateLimit = await consumeRateLimit({
-    request,
-    scope: "funnel-events",
-    limit: 120,
-    windowSeconds: 60
-  });
-  if (!rateLimit.available) {
-    return NextResponse.json(
-      { ok: false, message: "Analytics ingestion is temporarily unavailable." },
-      { status: 503, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } }
-    );
-  }
-  if (!rateLimit.allowed) {
-    return NextResponse.json(
-      { ok: false, message: "Too many analytics events." },
-      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } }
-    );
-  }
-
-  const body = await readBoundedJson(request, 32 * 1024);
-  if (!body.ok) {
-    const status = body.error === "unsupported_media_type" ? 415 : body.error === "payload_too_large" ? 413 : 400;
-    return NextResponse.json(
-      {
-        ok: false,
-        message: body.error === "payload_too_large" ? "Request body is too large." : "Invalid analytics payload."
-      },
-      { status }
-    );
-  }
-
-  const parsed = requestSchema.safeParse(body.value);
-  if (!parsed.success) {
-    return NextResponse.json({ ok: false, message: "Invalid analytics payload." }, { status: 400 });
-  }
+  if (!sameOrigin(request)) return new Response(null, { status: 204 });
+  const parsed = requestSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return new Response(null, { status: 204 });
 
   const { event, occurred_at: occurredAt, session_id: sessionId, context, properties } = parsed.data;
-  if (context.session_id !== sessionId) {
-    return NextResponse.json({ ok: false, message: "Invalid analytics payload." }, { status: 400 });
-  }
+  if (context.session_id !== sessionId) return new Response(null, { status: 204 });
   const userAgent = request.headers.get("user-agent") ?? "";
   const device = deviceInfo(userAgent);
   const lastTouch = context.last_touch;
@@ -216,6 +195,7 @@ export async function POST(request: Request) {
       session_id: sessionId,
       visitor_id: context.visitor_id,
       pageview_id: context.pageview_id,
+      lead_id: properties.lead_id ?? null,
       step_number: properties.step_number ?? null,
       step_key: properties.step_key ?? null,
       percent: properties.percent ?? properties.max_scroll_percent ?? null,
@@ -240,6 +220,12 @@ export async function POST(request: Request) {
       first_touch: context.first_touch,
       last_touch: context.last_touch,
       click_ids: clickIds,
+      conversion_type: ["booking_completed", "checkout_started", "payment_succeeded", "conversion_recorded"].includes(event)
+        ? event
+        : null,
+      value_cents: properties.value_cents ?? null,
+      currency: properties.currency?.toUpperCase() ?? null,
+      external_id: properties.external_id ?? null,
       metadata: {
         ...properties,
         session_number: context.session_number,
@@ -250,22 +236,9 @@ export async function POST(request: Request) {
       }
     });
 
-    if (error) {
-      console.error("[funnel-events] insert failed:", error.message);
-      return NextResponse.json(
-        { ok: false, message: "Analytics event could not be stored." },
-        { status: 503, headers: { "Retry-After": "30" } }
-      );
-    }
+    if (error) return new Response(null, { status: 204 });
     return NextResponse.json({ ok: true }, { status: 202 });
-  } catch (error) {
-    console.error(
-      "[funnel-events] unexpected failure:",
-      error instanceof Error ? error.message : "unknown error"
-    );
-    return NextResponse.json(
-      { ok: false, message: "Analytics event could not be stored." },
-      { status: 503, headers: { "Retry-After": "30" } }
-    );
+  } catch {
+    return new Response(null, { status: 204 });
   }
 }

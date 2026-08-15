@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
 import { WaitlistFunnel } from "@/components/waitlist-funnel";
-import { getPublicFunnelSettings } from "@/lib/funnel-settings";
+import { getFunnelSettings } from "@/lib/funnel-settings";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Inner Circle Application",
-  description:
-    "Apply to the Authentic Resell Inner Circle and choose a time to discuss your reselling goals.",
-  alternates: { canonical: "/" }
+  title: "Lucas Resells | Apply for the Inner Circle",
+  description: "Apply to build your high-ticket reselling business with the Inner Circle."
 };
 
 export default async function WaitlistPage() {
-  const settings = await getPublicFunnelSettings();
+  const settings = await getFunnelSettings();
   return <WaitlistFunnel settings={settings} />;
 }
