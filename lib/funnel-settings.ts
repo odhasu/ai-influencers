@@ -30,7 +30,7 @@ export const defaultFunnelSettings: FunnelSettings = {
   heroBody: "",
   waitlistHeading: "Apply Now",
   ctaLabel: "Get Started Now",
-  accentColor: "#F2C268",
+  accentColor: "#39FF14",
   formEnabled: true,
   autoAdvanceDelayMs: 240,
   showWins: true,

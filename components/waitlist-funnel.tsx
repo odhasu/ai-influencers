@@ -620,31 +620,8 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
     <>
       <CinematicCurtain />
 
-      <main
-        style={{
-          "--green": "#f2c268",
-          "--green-deep": "#b97a21"
-        } as CSSProperties}
-      >
-        <div className="announcement-bar">
-          Applications are open <span aria-hidden="true">•</span> Private Inner Circle
-        </div>
-
-        <header className="site-header">
-          <a className="brand-lockup" href="#hero-title" aria-label="Lucas Resells home">
-            <span className="brand-monogram">LR</span>
-            <span>
-              <strong>Lucas Resells</strong>
-              <small>Inner Circle</small>
-            </span>
-          </a>
-          <button className="header-cta" type="button" onClick={() => scrollToForm("header")}>
-            Apply now
-          </button>
-        </header>
-
+      <main style={{ "--green": settings.accentColor } as CSSProperties}>
         <section className="hero" aria-labelledby="hero-title">
-          <p className="hero-eyebrow">The private growth system for serious resellers</p>
           <h1
             id="hero-title"
             className={`main-title${settings.heroHeadline === brandedHeroHeadline ? " branded-main-title" : ""}`}
