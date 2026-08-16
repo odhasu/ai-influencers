@@ -262,6 +262,7 @@ function validStep(stepIndex: number, answers: Answers) {
 }
 
 export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
+  const accentColor = settings.accentColor.toLowerCase() === "#39ff14" ? "#f2c268" : settings.accentColor;
   const [answers, setAnswers] = useState<Answers>(initialAnswers);
   const [currentStep, setCurrentStep] = useState(0);
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
@@ -620,7 +621,7 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
     <>
       <CinematicCurtain />
 
-      <main style={{ "--green": settings.accentColor } as CSSProperties}>
+      <main style={{ "--green": accentColor } as CSSProperties}>
         <section className="hero" aria-labelledby="hero-title">
           <h1
             id="hero-title"
