@@ -158,116 +158,65 @@ const initialAnswers: Answers = {
   budget_range: ""
 };
 
-const winImages = [
-  ["img_QRRPzkCGFMuT9xArHuNWR", 320, 325],
-  ["img_X-biZtVijL98kAR1jwMKy", 320, 224],
-  ["img_yuCHlV6azfzk7a5jI1nIN", 320, 201],
-  ["img_OaIs3mxhFiRjjSUmK-9qk", 320, 262],
-  ["img_5enDm-0QLyhy8nEdfE3f4", 320, 218],
-  ["img_C3GXvDC7rELhMzxetJ-qP", 320, 371],
-  ["img_Id5zYTtOzzULo8KWdh7Ac", 320, 397],
-  ["img_Ac82tcfNUGKOx-hFkREDP", 320, 183],
-  ["img_VRuUWur-OD6ZxrBq6U1WF", 320, 351],
-  ["img_3T5BBuogeEUaKZLA8kyZq", 320, 383],
-  ["img_COn7aYJNXFO_jw7yR2ZOH", 320, 237],
-  ["img_xAODOuS5DfygDAWSg4yHb", 320, 371],
-  ["img_INT_Bz3HAueXt-9NT1S6U", 320, 377],
-  ["img_Ercn3Zfo9XhABuQyV6jSc", 320, 316],
-  ["img_Y-62LV4Qof02qf7fHRW7U", 320, 463],
-  ["img_MFwHHWHBsnnM1Po9ggpgw", 320, 288],
-  ["img_QEPj3oo8843YJA4xRLUKR", 320, 226],
-  ["img_BJJDWD-vpL3s5ReJ7xVRf", 320, 344],
-  ["img_X03lhN_oXgzh5wruDnHvK", 320, 304],
-  ["img_nG7-m6JupiCweZYe-XPse", 320, 228],
-  ["img_VRuUWur-OD6ZxrBq6U1WF", 320, 351],
-  ["img_c8UoUK-ppzWBG01LCZUaZ", 320, 247],
-  ["img_THYSiha0G-s0V9hIFcFRN", 320, 297],
-  ["img_-VnkG34E9THKDzbJUaVAT", 320, 330]
-] as const;
-
-const localWinImages = [
+const carouselWinImages = [
   {
-    src: "/wins/supreme-socks-win.png",
-    width: 926,
-    height: 850,
-    alt: "Inner Circle member showing Supreme product inventory",
-    timestampMask: { left: "29.35%", top: "22%", width: "23.2%", height: "3.76%", backgroundColor: "#08080a" }
+    src: "/wins/student-result-gross-volume.png",
+    width: 1170,
+    height: 1535,
+    alt: "Student result showing 12.5 thousand euros in gross volume"
   },
   {
-    src: "/wins/selling-7846-win.png",
-    width: 744,
-    height: 868,
-    alt: "Inner Circle member showing 7,846 dollars in 90-day sales",
-    timestampMask: { left: "26.75%", top: "14.6%", width: "27.25%", height: "4.1%", backgroundColor: "#1b1b1d" }
+    src: "/wins/student-result-total-sales.png",
+    width: 1170,
+    height: 1509,
+    alt: "Student result showing 340 dollars in total sales"
   },
   {
-    src: "/wins/cash-win.png",
-    width: 768,
-    height: 758,
-    alt: "Inner Circle member showing cash from reselling",
-    timestampMask: { left: "30.65%", top: "18.2%", width: "25.4%", height: "3.95%", backgroundColor: "#1a1b1f" }
+    src: "/wins/student-result-960.avif",
+    width: 960,
+    height: 743,
+    alt: "Student ecommerce result"
+  },
+  {
+    src: "/wins/student-result-balances.png",
+    width: 1170,
+    height: 809,
+    alt: "Student result showing 1,072 euros available for payout"
+  },
+  {
+    src: "/wins/student-result-visitors.jpg",
+    width: 1320,
+    height: 1230,
+    alt: "Student result showing 839 pounds in sales and 2,410 sessions"
+  },
+  {
+    src: "/wins/student-result-payout-631.png",
+    width: 1170,
+    height: 1133,
+    alt: "Student result showing 827 dollars in sales and a 631 dollar payout"
+  },
+  {
+    src: "/wins/student-result-payout-363.png",
+    width: 1170,
+    height: 1340,
+    alt: "Student result showing 547 euros in sales and a 363 euro payout"
   }
 ] as const;
-
-const carouselWinImages = [
-  ...localWinImages.map((win) => ({ ...win, kind: "local" as const })),
-  ...winImages.map(([id, width, height], index) => ({
-    kind: "remote" as const,
-    id,
-    width,
-    height,
-    alt: `Inner Circle result ${index + 1}`
-  }))
-];
 
 function ResultsCarouselSet({ duplicate = false }: { duplicate?: boolean }) {
   return (
     <div className="wins-carousel-set" aria-hidden={duplicate || undefined}>
-      {carouselWinImages.map((win, index) => (
-        <span
-          className={`win-image${win.kind === "local" ? " win-image-local" : ""}`}
-          key={win.kind === "local" ? win.src : `${win.id}-${index}`}
-        >
+      {carouselWinImages.map((win) => (
+        <span className="win-image" key={win.src}>
           <span className="win-image-frame">
-            {win.kind === "local" ? (
-              <>
-                <Image
-                  src={win.src}
-                  width={win.width}
-                  height={win.height}
-                  alt={win.alt}
-                  sizes="(max-width: 640px) 68vw, (max-width: 1100px) 30vw, 300px"
-                  quality={90}
-                />
-                <span className="win-time-mask" style={win.timestampMask} aria-hidden="true" />
-              </>
-            ) : (
-              <picture>
-                <source
-                  type="image/avif"
-                  srcSet={[320, 640, 960, 1280, 1920]
-                    .map((size) => `https://cdn.clyro.io/images/variants/${win.id}/${size}.avif ${size}w`)
-                    .join(", ")}
-                  sizes="(max-width: 640px) 68vw, (max-width: 1100px) 30vw, 300px"
-                />
-                <source
-                  type="image/webp"
-                  srcSet={[320, 640, 960, 1280, 1920]
-                    .map((size) => `https://cdn.clyro.io/images/variants/${win.id}/${size}.webp ${size}w`)
-                    .join(", ")}
-                  sizes="(max-width: 640px) 68vw, (max-width: 1100px) 30vw, 300px"
-                />
-                <img
-                  src={`https://cdn.clyro.io/images/variants/${win.id}/640.webp`}
-                  width={win.width}
-                  height={win.height}
-                  alt={win.alt}
-                  loading="lazy"
-                  decoding="async"
-                  fetchPriority="low"
-                />
-              </picture>
-            )}
+            <Image
+              src={win.src}
+              width={win.width}
+              height={win.height}
+              alt={win.alt}
+              sizes="(max-width: 640px) 68vw, (max-width: 1100px) 30vw, 300px"
+              quality={90}
+            />
           </span>
         </span>
       ))}
