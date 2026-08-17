@@ -50,6 +50,7 @@ The current design retains the original Authentic Resell structure and animation
 - Gold `Building $5K-$30K/Month` emphasis
 - Gold accent color `#F2C268` instead of neon green
 - Darker animated curtain background with a subtle warm tint
+- Slow staggered text entrances that slide upward while fading in
 - Responsive headline breaks for desktop and mobile
 - Application heading: `Apply Now`
 - Current branded headline: `See How Regular People Are Building $5K-$30K/Month AI Digital Ecom Businesses`
