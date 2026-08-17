@@ -7,7 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function QualifiedPage() {
-  return (
-    <ApplicationResult message="Thank you for applying. Someone will reach out to you via WhatsApp or SMS." />
-  );
+  return <ApplicationResult message="Thank you for applying" />;
 }
