@@ -700,7 +700,7 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
             className={`wins reveal-target${winsVisible ? " is-visible" : ""}`}
             aria-labelledby="wins-title"
           >
-            <h2 id="wins-title">More Inner Circle Wins:</h2>
+            <h2 id="wins-title">Student Results</h2>
             <div className="wins-masonry">
               {localWinImages.map((win) => (
                 <span
