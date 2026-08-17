@@ -21,6 +21,7 @@ The three public URLs above returned successfully during this review. The latest
 - Supabase Postgres with server-only access and versioned migrations
 - Zod request validation
 - PostHog client/server SDKs when configured
+- Lenis inertial scrolling on public routes, with reduced-motion support
 - Calendly inline scheduling and signed booking webhooks
 - Nodemailer with a Gmail App Password for booking notifications
 - Vercel hosting and request metadata
@@ -50,7 +51,8 @@ The current design retains the original Authentic Resell structure and animation
 - Gold `Building $5K-$30K/Month` emphasis
 - Gold accent color `#F2C268` instead of neon green
 - Darker animated curtain background with a subtle warm tint
-- Slow staggered text entrances that slide upward while fading in
+- Slow staggered hero text that rises in, plus a unified horizontal fade for Inner Circle Wins
+- Slowed inertial wheel scrolling on public pages while touch scrolling remains native
 - Responsive headline breaks for desktop and mobile
 - Application heading: `Apply Now`
 - Current branded headline: `See How Regular People Are Building $5K-$30K/Month AI Digital Ecom Businesses`

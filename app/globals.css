@@ -1285,13 +1285,25 @@ input:focus-visible {
   transform: translate3d(0, 30px, 0);
 }
 
+.wins.reveal-target .win-image {
+  transform: translate3d(-34px, 0, 0) scale(0.985);
+}
+
 .reveal-target.is-visible > h2 {
   animation: text-slide-fade 1.05s cubic-bezier(0.16, 1, 0.3, 1) both;
   will-change: opacity, transform;
 }
 
+.wins.reveal-target > h2 {
+  transform: translate3d(-32px, 0, 0);
+}
+
+.wins.reveal-target.is-visible > h2 {
+  animation-name: text-slide-fade-horizontal;
+}
+
 .reveal-target.is-visible .win-image {
-  animation: win-image-reveal 720ms cubic-bezier(0.16, 1, 0.3, 1) var(--win-delay, 0ms) both;
+  animation: win-image-reveal 1.08s cubic-bezier(0.16, 1, 0.3, 1) 140ms both;
   will-change: opacity, transform;
 }
 
@@ -1303,7 +1315,7 @@ input:focus-visible {
 @keyframes win-image-reveal {
   from {
     opacity: 0;
-    transform: translate3d(0, 30px, 0) scale(0.985);
+    transform: translate3d(-34px, 0, 0) scale(0.985);
   }
   to {
     opacity: 1;
@@ -1326,6 +1338,17 @@ input:focus-visible {
   from {
     opacity: 0;
     transform: translate3d(0, 30px, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes text-slide-fade-horizontal {
+  from {
+    opacity: 0;
+    transform: translate3d(-32px, 0, 0) scale(0.985);
   }
   to {
     opacity: 1;

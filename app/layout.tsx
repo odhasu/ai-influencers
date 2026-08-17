@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { AnalyticsPageTracker } from "@/components/analytics-page-tracker";
+import { SmoothScroll } from "@/components/smooth-scroll";
+import "lenis/dist/lenis.css";
 import "react-international-phone/style.css";
 import "./globals.css";
 
@@ -13,6 +15,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en">
       <body>
         {children}
+        <SmoothScroll />
         <AnalyticsPageTracker />
       </body>
     </html>

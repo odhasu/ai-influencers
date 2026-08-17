@@ -819,11 +819,10 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
           >
             <h2 id="wins-title">More Inner Circle Wins:</h2>
             <div className="wins-masonry">
-              {localWinImages.map((win, index) => (
+              {localWinImages.map((win) => (
                 <span
                   className="win-image win-image-local"
                   key={win.src}
-                  style={{ "--win-delay": `${index * 65}ms` } as CSSProperties}
                 >
                   <Image
                     src={win.src}
@@ -840,7 +839,6 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
                 <span
                   className="win-image"
                   key={`${id}-${index}`}
-                  style={{ "--win-delay": `${(index + localWinImages.length) * 65}ms` } as CSSProperties}
                 >
                   <picture>
                     <source
