@@ -82,7 +82,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       .update(update)
       .eq("id", id)
       .select(
-        "id,created_at,updated_at,full_name,email,phone_number,instagram,reselling_experience,long_term_goal,age_range,budget_range,lead_status,notes,follow_up_at,last_contacted_at,assigned_to,tags,referral_code,referral_link_id,utm_source,utm_medium,utm_campaign,country,city,form_duration_ms"
+        "id,created_at,updated_at,full_name,email,phone_number,instagram,start_timeline,biggest_struggle,reselling_experience,long_term_goal,age_range,budget_range,lead_status,notes,follow_up_at,last_contacted_at,assigned_to,tags,referral_code,referral_link_id,utm_source,utm_medium,utm_campaign,country,city,form_duration_ms"
       )
       .single();
 

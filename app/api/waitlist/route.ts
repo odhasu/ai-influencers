@@ -7,22 +7,13 @@ import { z } from "zod";
 export const runtime = "nodejs";
 
 const answersSchema = z.object({
-  reselling_experience: z.enum([
-    "I'm just starting",
-    "Less than 6 months",
-    "6 months - 1 year",
-    "1 - 2 years",
-    "2+ years"
-  ]),
+  start_timeline: z.enum(["ASAP - ready now", "Within 1-4 weeks", "Just researching for now"]),
   long_term_goal: z.enum([
-    "Full time income",
-    "Side hustle / extra income",
-    "Build a brand on social media",
-    "Bulk supplying to stores"
+    "Side hustle money - $1K-$2K/month",
+    "Part time money - $4K-$10K/month",
+    "Full time money - $15K+/month"
   ]),
-  age_range: z.enum(["13 - 17", "18 - 23", "24 - 35", "35+"]),
-  instagram: z.string().trim().max(100).default(""),
-  email: z.email().trim().max(254),
+  instagram: z.string().trim().min(2).max(100),
   full_name: z.string().trim().min(2).max(120),
   phone_number: z
     .string()
@@ -30,15 +21,17 @@ const answersSchema = z.object({
     .min(7)
     .max(40)
     .refine((value) => value.replace(/\D/g, "").length >= 7),
+  biggest_struggle: z.enum(["Lack of Direction", "Procrastination", "Skepticism"]),
   budget_range: z.enum([
     "Under $200 USD",
     "$200 - $500 USD",
     "$500 - $1K USD",
     "$1K - $3K USD",
     "$3K+ USD"
-  ]),
-  call_commitment: z.literal("Yes")
+  ])
 });
+
+const qualifiedBudgets = new Set(["$1K - $3K USD", "$3K+ USD"]);
 
 const attributionTouchSchema = z.object({
   captured_at: z.union([z.literal(""), z.iso.datetime()]),
@@ -134,7 +127,11 @@ export async function POST(request: Request) {
   }
 
   if (parsed.website) {
-    return NextResponse.json({ ok: true, leadId: crypto.randomUUID() });
+    return NextResponse.json({
+      ok: true,
+      leadId: crypto.randomUUID(),
+      qualification: qualifiedBudgets.has(parsed.answers.budget_range) ? "qualified" : "not-qualified"
+    });
   }
 
   const { answers, metadata } = parsed;
@@ -169,60 +166,66 @@ export async function POST(request: Request) {
         .map((key) => [key, lastTouch[key as keyof typeof lastTouch]])
         .filter(([, value]) => value)
     );
-    const normalizedEmail = answers.email.toLowerCase();
-    const { data: existingLead } = await supabase
+    const { data: existingLead, error: lookupError } = await supabase
       .from("waitlist_applications")
       .select("id,first_touch")
-      .eq("email", normalizedEmail)
+      .eq("phone_number", answers.phone_number)
+      .order("updated_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
+    if (lookupError) throw lookupError;
     const preservedFirstTouch =
       existingLead?.first_touch && Object.keys(existingLead.first_touch as Record<string, unknown>).length
         ? existingLead.first_touch
         : firstTouch;
 
-    const { data, error } = await supabase
-      .from("waitlist_applications")
-      .upsert({
-        reselling_experience: answers.reselling_experience,
-        long_term_goal: answers.long_term_goal,
-        age_range: answers.age_range,
-        instagram,
-        email: normalizedEmail,
-        full_name: answers.full_name,
-        phone_number: answers.phone_number,
-        budget_range: answers.budget_range,
-        session_id: metadata.session_id,
-        visitor_id: metadata.visitor_id || null,
-        pageview_id: metadata.pageview_id || null,
-        session_number: metadata.session_number,
-        timezone: metadata.timezone || null,
-        posthog_distinct_id: metadata.posthog_distinct_id || null,
-        form_duration_ms: metadata.form_duration_ms,
-        analytics_consent: metadata.analytics_consent,
-        referral_code: resolvedAttribution.referral_code,
-        referral_link_id: resolvedAttribution.referral_link_id,
-        utm_source: resolvedAttribution.utm_source,
-        utm_medium: resolvedAttribution.utm_medium,
-        utm_campaign: resolvedAttribution.utm_campaign,
-        utm_content: resolvedAttribution.utm_content,
-        utm_term: resolvedAttribution.utm_term,
-        first_touch: preservedFirstTouch,
-        last_touch: lastTouch,
-        click_ids: clickIds,
-        referrer: [lastTouch.referrer_domain, lastTouch.referrer_path].filter(Boolean).join("") || null,
-        referrer_domain: lastTouch.referrer_domain || null,
-        landing_path: lastTouch.landing_path || null,
-        gclid: lastTouch.gclid || null,
-        fbclid: lastTouch.fbclid || null,
-        ttclid: lastTouch.ttclid || null,
-        msclkid: lastTouch.msclkid || null,
-        user_agent: safeHeader(request.headers, "user-agent", 500) || null,
-        country: safeHeader(request.headers, "x-vercel-ip-country", 8) || null,
-        region: decodedHeader(request.headers, "x-vercel-ip-country-region", 80) || null,
-        city: decodedHeader(request.headers, "x-vercel-ip-city", 160) || null
-      }, { onConflict: "email" })
-      .select("id")
-      .single();
+    const leadPayload = {
+      start_timeline: answers.start_timeline,
+      long_term_goal: answers.long_term_goal,
+      instagram,
+      full_name: answers.full_name,
+      phone_number: answers.phone_number,
+      biggest_struggle: answers.biggest_struggle,
+      budget_range: answers.budget_range,
+      session_id: metadata.session_id,
+      visitor_id: metadata.visitor_id || null,
+      pageview_id: metadata.pageview_id || null,
+      session_number: metadata.session_number,
+      timezone: metadata.timezone || null,
+      posthog_distinct_id: metadata.posthog_distinct_id || null,
+      form_duration_ms: metadata.form_duration_ms,
+      analytics_consent: metadata.analytics_consent,
+      referral_code: resolvedAttribution.referral_code,
+      referral_link_id: resolvedAttribution.referral_link_id,
+      utm_source: resolvedAttribution.utm_source,
+      utm_medium: resolvedAttribution.utm_medium,
+      utm_campaign: resolvedAttribution.utm_campaign,
+      utm_content: resolvedAttribution.utm_content,
+      utm_term: resolvedAttribution.utm_term,
+      first_touch: preservedFirstTouch,
+      last_touch: lastTouch,
+      click_ids: clickIds,
+      referrer: [lastTouch.referrer_domain, lastTouch.referrer_path].filter(Boolean).join("") || null,
+      referrer_domain: lastTouch.referrer_domain || null,
+      landing_path: lastTouch.landing_path || null,
+      gclid: lastTouch.gclid || null,
+      fbclid: lastTouch.fbclid || null,
+      ttclid: lastTouch.ttclid || null,
+      msclkid: lastTouch.msclkid || null,
+      user_agent: safeHeader(request.headers, "user-agent", 500) || null,
+      country: safeHeader(request.headers, "x-vercel-ip-country", 8) || null,
+      region: decodedHeader(request.headers, "x-vercel-ip-country-region", 80) || null,
+      city: decodedHeader(request.headers, "x-vercel-ip-city", 160) || null
+    };
+    const leadResult = existingLead
+      ? await supabase
+          .from("waitlist_applications")
+          .update(leadPayload)
+          .eq("id", existingLead.id)
+          .select("id")
+          .single()
+      : await supabase.from("waitlist_applications").insert(leadPayload).select("id").single();
+    const { data, error } = leadResult;
 
     if (error || !data) {
       console.error("waitlist_insert_failed", {
@@ -319,7 +322,11 @@ export async function POST(request: Request) {
 
     await Promise.allSettled(operationalTasks);
 
-    return NextResponse.json({ ok: true, leadId: data.id });
+    return NextResponse.json({
+      ok: true,
+      leadId: data.id,
+      qualification: qualifiedBudgets.has(answers.budget_range) ? "qualified" : "not-qualified"
+    });
   } catch (error) {
     console.error("waitlist_request_failed", {
       message: error instanceof Error ? error.message : "Unknown server error"

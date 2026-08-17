@@ -17,7 +17,7 @@ export async function GET() {
     const { data, error } = await supabase
       .from("waitlist_applications")
       .select(
-        "created_at,full_name,email,phone_number,instagram,lead_status,budget_range,reselling_experience,long_term_goal,age_range,referral_code,utm_source,utm_medium,utm_campaign,country,city,assigned_to,tags,follow_up_at,notes"
+        "created_at,full_name,email,phone_number,instagram,lead_status,start_timeline,long_term_goal,biggest_struggle,budget_range,reselling_experience,age_range,referral_code,utm_source,utm_medium,utm_campaign,country,city,assigned_to,tags,follow_up_at,notes"
       )
       .order("created_at", { ascending: false })
       .limit(10000);
@@ -30,9 +30,11 @@ export async function GET() {
       "phone_number",
       "instagram",
       "lead_status",
+      "start_timeline",
+      "long_term_goal",
+      "biggest_struggle",
       "budget_range",
       "reselling_experience",
-      "long_term_goal",
       "age_range",
       "referral_code",
       "utm_source",

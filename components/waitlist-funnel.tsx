@@ -5,6 +5,7 @@ import {
   ArrowRight
 } from "lucide-react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { PhoneInput } from "react-international-phone";
 import {
   CSSProperties,
@@ -24,15 +25,13 @@ import {
 import type { FunnelSettings } from "@/lib/funnel-settings";
 
 type AnswerKey =
-  | "reselling_experience"
+  | "start_timeline"
   | "long_term_goal"
-  | "age_range"
   | "instagram"
-  | "email"
   | "full_name"
   | "phone_number"
-  | "budget_range"
-  | "call_commitment";
+  | "biggest_struggle"
+  | "budget_range";
 
 type Answers = Record<AnswerKey, string>;
 
@@ -56,19 +55,6 @@ type FunnelStep = {
   fields: ReadonlyArray<ChoiceField | TextField>;
 };
 
-type CalendlyApi = {
-  initInlineWidget: (options: { url: string; parentElement: HTMLElement }) => void;
-};
-
-declare global {
-  interface Window {
-    Calendly?: CalendlyApi;
-  }
-}
-
-const calendlyUrl =
-  "https://calendly.com/ogvendorss/htr-call?hide_event_type_details=1&hide_gdpr_banner=1&background_color=ffffff&text_color=111111&primary_color=000000";
-
 const brandedHeroHeadline =
   "See How Regular People Are Building $5K-$30K/Month AI Digital Ecom Businesses";
 const previousBrandedHeroHeadline =
@@ -76,81 +62,83 @@ const previousBrandedHeroHeadline =
 
 const steps: ReadonlyArray<FunnelStep> = [
   {
-    key: "experience",
-    title: "How long have you been reselling?",
+    key: "full-name",
+    title: "What is your full name?",
     fields: [
       {
-        id: "reselling_experience",
+        id: "full_name",
+        type: "text",
+        placeholder: "Full name",
+        autocomplete: "name"
+      }
+    ]
+  },
+  {
+    key: "start-timeline",
+    title: "How soon are you looking to start?",
+    fields: [
+      {
+        id: "start_timeline",
         type: "button-group",
         options: [
-          ["A", "I'm just starting"],
-          ["B", "Less than 6 months"],
-          ["C", "6 months - 1 year"],
-          ["D", "1 - 2 years"],
-          ["E", "2+ years"]
+          ["A", "ASAP - ready now"],
+          ["B", "Within 1-4 weeks"],
+          ["C", "Just researching for now"]
         ]
       }
     ]
   },
   {
     key: "goal",
-    title: "What's your long term goal with reselling?",
+    title: "What is your long-term goal in becoming profitable with AI digital e-commerce?",
     fields: [
       {
         id: "long_term_goal",
         type: "button-group",
         options: [
-          ["A", "Full time income"],
-          ["B", "Side hustle / extra income"],
-          ["C", "Build a brand on social media"],
-          ["D", "Bulk supplying to stores"]
+          ["A", "Side hustle money - $1K-$2K/month"],
+          ["B", "Part time money - $4K-$10K/month"],
+          ["C", "Full time money - $15K+/month"]
         ]
       }
     ]
   },
   {
-    key: "age",
-    title: "How old are you?",
+    key: "phone",
+    title: "What is your phone number?",
     fields: [
-      {
-        id: "age_range",
-        type: "button-group",
-        options: [
-          ["A", "13 - 17"],
-          ["B", "18 - 23"],
-          ["C", "24 - 35"],
-          ["D", "35+"]
-        ]
-      }
-    ]
-  },
-  {
-    key: "email",
-    title: "Got it, and what's the best email to reach you at?",
-    fields: [
-      {
-        id: "email",
-        type: "email",
-        placeholder: "your@email.com",
-        autocomplete: "email"
-      }
-    ]
-  },
-  {
-    key: "contact",
-    title: "And your name and phone number?",
-    fields: [
-      {
-        id: "full_name",
-        type: "text",
-        placeholder: "Full Name",
-        autocomplete: "name"
-      },
       {
         id: "phone_number",
         type: "tel",
         placeholder: "Phone number",
         autocomplete: "tel"
+      }
+    ]
+  },
+  {
+    key: "instagram",
+    title: "What is your Instagram?",
+    fields: [
+      {
+        id: "instagram",
+        type: "text",
+        placeholder: "@yourusername",
+        autocomplete: "off"
+      }
+    ]
+  },
+  {
+    key: "biggest-struggle",
+    title: "What has been your biggest struggle so far in achieving your goals?",
+    fields: [
+      {
+        id: "biggest_struggle",
+        type: "button-group",
+        options: [
+          ["A", "Lack of Direction"],
+          ["B", "Procrastination"],
+          ["C", "Skepticism"]
+        ]
       }
     ]
   },
@@ -171,34 +159,17 @@ const steps: ReadonlyArray<FunnelStep> = [
         ]
       }
     ]
-  },
-  {
-    key: "call-commitment",
-    title: "Cool, just before I get you on a call to see if I can help you hit your goals...",
-    subtitle: "Can you make sure to choose a time slot that you can 100% commit to?",
-    fields: [
-      {
-        id: "call_commitment",
-        type: "button-group",
-        options: [
-          ["A", "Yes"],
-          ["B", "No"]
-        ]
-      }
-    ]
   }
 ];
 
 const initialAnswers: Answers = {
-  reselling_experience: "",
+  start_timeline: "",
   long_term_goal: "",
-  age_range: "",
   instagram: "",
-  email: "",
   full_name: "",
   phone_number: "",
-  budget_range: "",
-  call_commitment: ""
+  biggest_struggle: "",
+  budget_range: ""
 };
 
 const winImages = [
@@ -256,7 +227,6 @@ function validStep(stepIndex: number, answers: Answers) {
   return steps[stepIndex].fields.every((field) => {
     const value = answers[field.id].trim();
     if (!value) return false;
-    if (field.id === "call_commitment") return value === "Yes";
     if (field.type === "email") return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
     if (field.type === "tel") return value.replace(/\D/g, "").length >= 7;
     return true;
@@ -264,12 +234,13 @@ function validStep(stepIndex: number, answers: Answers) {
 }
 
 export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
+  const router = useRouter();
   const accentColor = settings.accentColor.toLowerCase() === "#39ff14" ? "#f2c268" : settings.accentColor;
   const isBrandedHero =
     settings.heroHeadline === brandedHeroHeadline || settings.heroHeadline === previousBrandedHeroHeadline;
   const [answers, setAnswers] = useState<Answers>(initialAnswers);
   const [currentStep, setCurrentStep] = useState(0);
-  const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "submitting" | "error">("idle");
   const [validationVisible, setValidationVisible] = useState(false);
 
   const formRef = useRef<HTMLFormElement>(null);
@@ -280,7 +251,6 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
   const completedStepsRef = useRef(new Set<number>());
   const viewedStepsRef = useRef(new Set<number>());
   const formViewedRef = useRef(false);
-  const calendlyRef = useRef<HTMLDivElement>(null);
   const winsRef = useRef<HTMLElement>(null);
   const finalCtaRef = useRef<HTMLDivElement>(null);
   const [winsVisible, setWinsVisible] = useState(false);
@@ -289,9 +259,6 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
   const stepViewedAtRef = useRef(0);
   const abandonmentTrackedRef = useRef(false);
   const submittedRef = useRef(false);
-  const bookingStartedRef = useRef(false);
-  const bookingCompletedRef = useRef(false);
-  const leadIdRef = useRef("");
   const currentStepRef = useRef(0);
 
   const step = steps[currentStep];
@@ -304,63 +271,6 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
   }, []);
 
   useEffect(() => {
-    if (status !== "success" || !calendlyRef.current) return;
-
-    const parentElement = calendlyRef.current;
-    const initCalendly = () => {
-      if (!window.Calendly || parentElement.dataset.calendlyMounted === "true") return;
-      parentElement.dataset.calendlyMounted = "true";
-      parentElement.innerHTML = "";
-      if (!bookingStartedRef.current) {
-        bookingStartedRef.current = true;
-        captureFunnelEvent("booking_started", {
-          provider: "calendly",
-          lead_id: leadIdRef.current || undefined
-        });
-      }
-      window.Calendly.initInlineWidget({
-        url: calendlyUrl,
-        parentElement
-      });
-    };
-
-    if (window.Calendly) {
-      initCalendly();
-      return;
-    }
-
-    const existingScript = document.querySelector<HTMLScriptElement>("#calendly-widget-script");
-    if (existingScript) {
-      existingScript.addEventListener("load", initCalendly, { once: true });
-      return () => existingScript.removeEventListener("load", initCalendly);
-    }
-
-    const script = document.createElement("script");
-    script.id = "calendly-widget-script";
-    script.src = "https://assets.calendly.com/assets/external/widget.js";
-    script.async = true;
-    script.addEventListener("load", initCalendly, { once: true });
-    document.body.appendChild(script);
-
-    return () => script.removeEventListener("load", initCalendly);
-  }, [status]);
-
-  useEffect(() => {
-    const onMessage = (event: MessageEvent) => {
-      try {
-        const hostname = new URL(event.origin).hostname;
-        if (hostname !== "calendly.com" && !hostname.endsWith(".calendly.com")) return;
-      } catch {
-        return;
-      }
-      if (event.data?.event !== "calendly.event_scheduled" || bookingCompletedRef.current) return;
-      bookingCompletedRef.current = true;
-      captureFunnelEvent("booking_completed", {
-        provider: "calendly",
-        lead_id: leadIdRef.current || undefined
-      });
-    };
-
     const onPageHide = () => {
       if (!formStartedTrackedRef.current || submittedRef.current || abandonmentTrackedRef.current) return;
       abandonmentTrackedRef.current = true;
@@ -373,11 +283,9 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
       });
     };
 
-    window.addEventListener("message", onMessage);
     window.addEventListener("pagehide", onPageHide);
     window.addEventListener("beforeunload", onPageHide);
     return () => {
-      window.removeEventListener("message", onMessage);
       window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener("beforeunload", onPageHide);
     };
@@ -385,7 +293,6 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
 
   useEffect(() => {
     currentStepRef.current = currentStep;
-    if (status === "success") return;
     if (viewedStepsRef.current.has(currentStep)) return;
 
     viewedStepsRef.current.add(currentStep);
@@ -395,7 +302,7 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
       step_key: step.key,
       total_steps: steps.length
     });
-  }, [currentStep, status, step.key]);
+  }, [currentStep, step.key]);
 
   useEffect(() => {
     if (!formRef.current || formViewedRef.current) return;
@@ -525,7 +432,7 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
   }
 
   function advance(nextAnswers: Answers = answers) {
-    if (status === "submitting" || status === "success") return;
+    if (status === "submitting") return;
     markFormStarted();
 
     if (!validStep(currentStep, nextAnswers)) {
@@ -586,19 +493,22 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
         })
       });
 
-      const result = (await response.json()) as { ok?: boolean; leadId?: string; message?: string };
+      const result = (await response.json()) as {
+        ok?: boolean;
+        leadId?: string;
+        qualification?: "qualified" | "not-qualified";
+        message?: string;
+      };
       if (!response.ok || !result.ok) {
         throw new Error(result.message || "The application could not be saved.");
       }
 
       if (result.leadId) {
-        leadIdRef.current = result.leadId;
-        submittedRef.current = true;
         identifyAnalyticsLead(result.leadId);
         captureFunnelEvent("form_success_shown", { lead_id: result.leadId });
       }
-
-      setStatus("success");
+      submittedRef.current = true;
+      router.push(result.qualification === "qualified" ? "/qualified" : "/not-qualified");
     } catch (error) {
       setStatus("error");
       captureFunnelEvent("form_submit_failed", {
@@ -667,17 +577,6 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
                 <div className="success-panel paused-panel">
                   <h3>Applications are temporarily paused.</h3>
                   <p>Check back soon for the next opening.</p>
-                </div>
-              ) : status === "success" ? (
-                <div className="booking-panel">
-                  <div className="booking-copy">
-                    <span className="step-number">8</span>
-                    <h3>Application received. Choose your call time.</h3>
-                    <p>Pick a slot you can 100% commit to.</p>
-                  </div>
-                  <div className="calendly-card" ref={calendlyRef}>
-                    <div className="calendly-loading">Loading calendar...</div>
-                  </div>
                 </div>
               ) : (
                 <div className="step-content" key={step.key}>
@@ -756,9 +655,7 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
 
                   {validationVisible ? (
                     <p className="form-message validation-message" role="alert">
-                      {step.key === "call-commitment"
-                        ? "Only continue if you can 100% commit to the call time."
-                        : "Complete this step before continuing."}
+                      Complete this step before continuing.
                     </p>
                   ) : null}
 
@@ -771,7 +668,7 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
               )}
             </div>
 
-            {settings.formEnabled && status !== "success" ? (
+            {settings.formEnabled ? (
               <>
                 <div className="form-nav">
                   <button

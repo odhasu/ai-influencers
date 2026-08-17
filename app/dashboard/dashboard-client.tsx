@@ -728,7 +728,7 @@ function HomeTab({
             {leads.slice(0, 7).map((lead) => (
               <button type="button" key={lead.id} onClick={() => onOpenLead(lead)}>
                 <div className={styles.avatar}>{lead.full_name.slice(0, 2).toUpperCase()}</div>
-                <div><strong>{lead.full_name}</strong><span>{lead.email}</span></div>
+                <div><strong>{lead.full_name}</strong><span>{lead.email || lead.phone_number}</span></div>
                 <span className={`${styles.status} ${styles[lead.lead_status]}`}>{statusLabels[lead.lead_status]}</span>
                 <p>{new Date(lead.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</p>
               </button>
@@ -903,7 +903,7 @@ function AnalyticsTab({
             {leads.slice(0, 5).map((lead) => (
               <div key={lead.id}>
                 <div className={styles.avatar}>{lead.full_name.slice(0, 2).toUpperCase()}</div>
-                <div><strong>{lead.full_name}</strong><span>{lead.email}</span></div>
+                <div><strong>{lead.full_name}</strong><span>{lead.email || lead.phone_number}</span></div>
                 <span className={`${styles.status} ${styles[lead.lead_status]}`}>{statusLabels[lead.lead_status]}</span>
                 <p>{new Date(lead.created_at).toLocaleDateString()}</p>
               </div>
@@ -988,7 +988,7 @@ function LeadsTab({
         </div>
 
         <div className={styles.filters}>
-          <label className={styles.search}><Search size={17} /><input value={search} placeholder="Search name, email, phone or source" onChange={(event) => onSearch(event.target.value)} /></label>
+          <label className={styles.search}><Search size={17} /><input value={search} placeholder="Search name, phone, Instagram or source" onChange={(event) => onSearch(event.target.value)} /></label>
           <select aria-label="Received date" value={timeRange} onChange={(event) => onTimeRange(event.target.value as LeadTimeRange)}>
             <option value="all">Received: any time</option>
             <option value="today">Received: today</option>
@@ -1039,7 +1039,7 @@ function LeadsTab({
             <tbody>
               {leads.map((lead) => (
                 <tr key={lead.id} onClick={() => onOpenLead(lead)}>
-                  <td><div className={styles.leadCell}><div className={styles.avatar}>{lead.full_name.slice(0, 2).toUpperCase()}</div><div><strong>{lead.full_name}</strong><span>{lead.email}</span></div></div></td>
+                  <td><div className={styles.leadCell}><div className={styles.avatar}>{lead.full_name.slice(0, 2).toUpperCase()}</div><div><strong>{lead.full_name}</strong><span>{lead.email || lead.phone_number}</span></div></div></td>
                   <td><span className={`${styles.status} ${styles[lead.lead_status]}`}>{statusLabels[lead.lead_status]}</span></td>
                   <td>{lead.budget_range}</td>
                   <td>{lead.referral_code || lead.utm_source || "Direct"}</td>
@@ -1273,7 +1273,7 @@ function LeadDrawer({
         </div>
 
         <div className={styles.contactActions}>
-          <a href={`mailto:${lead.email}`}><Mail size={16} /> Email</a>
+          {lead.email ? <a href={`mailto:${lead.email}`}><Mail size={16} /> Email</a> : null}
           <a href={`tel:${lead.phone_number}`}><Phone size={16} /> Call</a>
           {hasInstagramHandle(lead.instagram) ? (
             <a href={`https://instagram.com/${lead.instagram.replace(/^@/, "")}`} target="_blank" rel="noreferrer"><AtSign size={16} /> Instagram</a>
@@ -1304,9 +1304,11 @@ function LeadDrawer({
           <h3>Qualification</h3>
           <dl>
             <div><dt>Budget</dt><dd>{lead.budget_range}</dd></div>
-            <div><dt>Experience</dt><dd>{lead.reselling_experience}</dd></div>
+            <div><dt>Start timeline</dt><dd>{lead.start_timeline || "Not collected"}</dd></div>
             <div><dt>Goal</dt><dd>{lead.long_term_goal}</dd></div>
-            <div><dt>Age</dt><dd>{lead.age_range}</dd></div>
+            <div><dt>Biggest struggle</dt><dd>{lead.biggest_struggle || "Not collected"}</dd></div>
+            {lead.reselling_experience ? <div><dt>Legacy experience</dt><dd>{lead.reselling_experience}</dd></div> : null}
+            {lead.age_range ? <div><dt>Legacy age</dt><dd>{lead.age_range}</dd></div> : null}
             <div><dt>Location</dt><dd>{[lead.city, lead.country].filter(Boolean).join(", ") || "Unknown"}</dd></div>
             <div><dt>Referral</dt><dd>{lead.referral_code || "None"}</dd></div>
             <div><dt>Source</dt><dd>{lead.utm_source || "Direct / unknown"}</dd></div>

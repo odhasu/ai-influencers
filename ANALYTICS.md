@@ -123,7 +123,7 @@ The following variables are reserved for PostHog project administration but are 
 
 ## Lead submission events
 
-The browser emits `form_submit_started` before calling `/api/waitlist`. After a successful Supabase upsert:
+The browser emits `form_submit_started` before calling `/api/waitlist`. After a successful Supabase save:
 
 - The server always stores a first-party `form_submit_succeeded` operational event.
 - The server mirrors that event to PostHog only when the lead granted analytics consent.

@@ -10,12 +10,14 @@ export type DashboardLead = {
   created_at: string;
   updated_at: string;
   full_name: string;
-  email: string;
+  email: string | null;
   phone_number: string;
   instagram: string;
-  reselling_experience: string;
+  start_timeline: string | null;
+  biggest_struggle: string | null;
+  reselling_experience: string | null;
   long_term_goal: string;
-  age_range: string;
+  age_range: string | null;
   budget_range: string;
   lead_status: LeadStatus;
   notes: string;
@@ -114,7 +116,7 @@ export async function getDashboardPayload(): Promise<DashboardPayload> {
       supabase
         .from("waitlist_applications")
         .select(
-          "id,created_at,updated_at,full_name,email,phone_number,instagram,reselling_experience,long_term_goal,age_range,budget_range,lead_status,notes,follow_up_at,last_contacted_at,assigned_to,tags,referral_code,referral_link_id,utm_source,utm_medium,utm_campaign,country,city,form_duration_ms,visitor_id,session_number,timezone,referrer_domain,gclid,fbclid,ttclid,msclkid,first_touch,last_touch"
+          "id,created_at,updated_at,full_name,email,phone_number,instagram,start_timeline,biggest_struggle,reselling_experience,long_term_goal,age_range,budget_range,lead_status,notes,follow_up_at,last_contacted_at,assigned_to,tags,referral_code,referral_link_id,utm_source,utm_medium,utm_campaign,country,city,form_duration_ms,visitor_id,session_number,timezone,referrer_domain,gclid,fbclid,ttclid,msclkid,first_touch,last_touch"
         )
         .order("created_at", { ascending: false })
         .limit(1000),
@@ -169,6 +171,8 @@ export async function getDashboardPayload(): Promise<DashboardPayload> {
             ...fallback,
             leads: (legacyResult.data ?? []).map((lead) => ({
               ...lead,
+              start_timeline: null,
+              biggest_struggle: null,
               lead_status: "new" as const,
               notes: "",
               follow_up_at: null,

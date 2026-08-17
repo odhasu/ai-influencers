@@ -1,6 +1,6 @@
 # Authentic Resell Application Funnel
 
-Production Next.js application for Authentic Resell. It combines a public multi-step application, Supabase lead storage, referral and attribution tracking, a private lead dashboard, and an inline Calendly booking handoff.
+Production Next.js application for Authentic Resell. It combines a public multi-step application, Supabase lead storage, budget-based qualification outcomes, referral and attribution tracking, and a private lead dashboard.
 
 Last reviewed: **August 17, 2026**
 
@@ -22,7 +22,7 @@ The three public URLs above returned successfully during this review. The latest
 - Zod request validation
 - PostHog client/server SDKs when configured
 - Lenis inertial scrolling on public routes, with reduced-motion support
-- Calendly inline scheduling and signed booking webhooks
+- Legacy Calendly signed booking webhooks
 - Nodemailer with a Gmail App Password for booking notifications
 - Vercel hosting and request metadata
 
@@ -32,10 +32,12 @@ The three public URLs above returned successfully during this review. The latest
 | --- | --- |
 | `/` | Public application funnel |
 | `/waitlist` | Public application funnel |
+| `/qualified` | Confirmation for the top two budget tiers |
+| `/not-qualified` | Confirmation for budget tiers below $1K |
 | `/waitlist-thank-you` | Legacy thank-you experience retained for future use |
 | `/dashboard` | Private lead, referral, analytics, and settings dashboard |
 | `/admin/login` | Dashboard authentication |
-| `/api/waitlist` | Validated lead upsert and operational follow-up tasks |
+| `/api/waitlist` | Validated lead create/update and qualification decision |
 | `/api/funnel-events` | Consented first-party behavioral event ingestion |
 | `/api/conversions` | Authenticated booking, checkout, payment, and conversion ingestion |
 | `/api/webhooks/calendly` | Signed Calendly booking webhook and Gmail notification |
@@ -63,28 +65,27 @@ The renderer also recognizes the previous branded headline and previous `#39FF14
 
 The application asks seven steps:
 
-1. Reselling experience
-2. Long-term reselling goal
-3. Age range
-4. Email address
-5. Full name and phone number
-6. Available budget
-7. Confirmation that the applicant can commit to the booked call
+1. Full name
+2. How soon the applicant wants to start
+3. Long-term AI digital e-commerce income goal
+4. Phone number with an international country selector
+5. Instagram handle
+6. Biggest struggle so far
+7. Available budget
 
-The former Instagram question is not shown. The server stores `not_provided` to remain compatible with the existing database and dashboard field.
+The income-goal and budget choices currently use USD. The current application does not collect email.
 
 Submission behavior:
 
 - The browser validates each step before advancing.
 - The final request is validated again with Zod on the server.
 - A honeypot absorbs basic bot submissions.
-- Email is normalized and used as the Supabase upsert key.
+- Phone number is used to match and update repeat applications.
 - Existing first-touch attribution is preserved for repeat submissions.
 - Success is shown only after the server confirms storage.
-- Calendly opens inline in the application card after success.
+- `$1K - $3K USD` and `$3K+ USD` route to `/qualified`.
+- The three budget tiers below `$1K` route to `/not-qualified`.
 - Optional lead webhooks run independently and cannot invalidate a stored lead.
-
-The active Calendly URL is currently set in `components/waitlist-funnel.tsx` to `https://calendly.com/ogvendorss/htr-call`.
 
 ## Dashboard and data model
 
@@ -165,10 +166,11 @@ Do not describe analytics as fully active until the consent UI is mounted and ve
 
 ## Important files
 
-- `components/waitlist-funnel.tsx` — application flow, branded hero compatibility, analytics hooks, and Calendly state
+- `components/waitlist-funnel.tsx` — application flow, branded hero compatibility, analytics hooks, and qualification routing
+- `components/application-result.tsx` — shared qualified and not-qualified confirmation layout
 - `components/cinematic-curtain.tsx` — animated curtain structure
 - `app/globals.css` — public and thank-you styling
-- `app/api/waitlist/route.ts` — lead validation and Supabase upserts
+- `app/api/waitlist/route.ts` — lead validation, Supabase storage, and server-side qualification
 - `app/api/funnel-events/route.ts` — first-party analytics validation and storage
 - `app/api/conversions/route.ts` — authenticated conversion ingestion
 - `app/api/webhooks/calendly/route.ts` — signed webhook and booking email handling
@@ -208,7 +210,7 @@ For public UI changes, also verify desktop and mobile behavior in a browser:
 - `/` and `/waitlist` render without horizontal overflow.
 - The current hero copy and gold palette are visible.
 - Form validation, selection auto-advance, and back navigation work.
-- A valid application is acknowledged by Supabase before Calendly appears.
+- A valid application is acknowledged by Supabase before the matching qualification result appears.
 - Browser console output has no unexplained errors.
 
 For operational changes, verify:

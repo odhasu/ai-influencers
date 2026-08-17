@@ -34,8 +34,8 @@ The public funnel uses:
 - The headline `See How Regular People Are Building $5K-$30K/Month AI Digital Ecom Businesses`
 - Gold as the default accent (`#F2C268`), including compatibility for the previous neon-green saved setting
 - A seven-step application form
-- Server-validated Supabase lead upserts keyed by normalized email
-- Inline Calendly scheduling after a successful submission
+- Server-validated Supabase lead updates matched by international phone number
+- Budget-based post-submission routing to `/qualified` and `/not-qualified`
 - A result gallery and configurable public funnel settings
 
 The private dashboard includes lead management, activity history, CSV export, referral links, attribution reporting, analytics summaries, and public funnel settings.
@@ -61,7 +61,7 @@ Do not describe behavioral analytics as fully active until the consent UI is mou
 1. Mount and verify the analytics-consent UI on public routes only.
 2. Configure PostHog variables and create initial acquisition, completion, and conversion dashboards.
 3. Configure and test the signed Calendly webhook plus Gmail booking notification variables.
-4. Add automated end-to-end coverage for form validation, submission, Calendly handoff, and dashboard authentication.
+4. Add automated end-to-end coverage for form validation, submission, both qualification outcomes, and dashboard authentication.
 5. Update the page metadata from “high-ticket reselling” to the current AI Digital Ecom positioning when the marketing copy is finalized.
 6. Review the legacy `show_consent_banner` database column and either reconnect it to the UI or remove it in a migration.
 
@@ -81,7 +81,7 @@ Also verify:
 - The hero uses the current AI Digital Ecom wording.
 - All former neon-green public accents render as gold.
 - Form validation and back/forward navigation work.
-- A successful submission is confirmed by the server before Calendly appears.
+- A successful submission is confirmed by the server before either qualification result appears.
 - `/dashboard` redirects unauthenticated users to `/admin/login`.
 - Referral parameters survive submission without arbitrary query parameters entering analytics.
 - Browser console output has no unexplained warnings or errors.

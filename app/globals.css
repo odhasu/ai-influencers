@@ -1024,6 +1024,62 @@ main {
   padding: clamp(64px, 9vw, 120px) 0 48px;
 }
 
+.application-result-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px 16px;
+}
+
+.application-result-card {
+  width: min(720px, 100%);
+  padding: clamp(42px, 7vw, 76px) clamp(24px, 7vw, 72px);
+  border: 1px solid rgba(242, 194, 104, 0.24);
+  border-radius: 18px;
+  background: linear-gradient(160deg, rgba(14, 14, 14, 0.96), rgba(3, 3, 3, 0.98));
+  box-shadow: 0 32px 90px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  animation: step-up 700ms cubic-bezier(0.2, 0.75, 0.2, 1) both;
+}
+
+.application-result-icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 22px;
+  border: 1px solid rgba(242, 194, 104, 0.42);
+  border-radius: 50%;
+  background: rgba(242, 194, 104, 0.1);
+  color: var(--green);
+}
+
+.application-result-kicker {
+  margin: 0 0 14px;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.application-result-card h1 {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(38px, 8vw, 66px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1;
+}
+
+.application-result-message {
+  max-width: 580px;
+  margin: 26px auto 0;
+  color: #d4d4d4;
+  font-size: clamp(17px, 2.5vw, 20px);
+  line-height: 1.6;
+}
+
 .thank-you-hero {
   width: min(960px, calc(100% - 32px));
   margin: 0 auto;
