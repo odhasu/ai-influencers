@@ -56,6 +56,7 @@ The current design retains the original Authentic Resell structure and animation
 - Slow staggered hero text that rises in, plus a unified horizontal fade for Inner Circle Wins
 - Slowed inertial wheel scrolling on public pages while touch scrolling remains native
 - Responsive headline breaks for desktop and mobile
+- Mobile-specific safe-area spacing, compact funnel sizing, touch targets, and result-page layouts down to 320px
 - Application heading: `Apply Now`
 - Current branded headline: `See How Regular People Are Building $5K-$30K/Month AI Digital Ecom Businesses`
 
