@@ -12,7 +12,7 @@ export type DashboardLead = {
   full_name: string;
   email: string | null;
   phone_number: string;
-  instagram: string;
+  instagram: string | null;
   start_timeline: string | null;
   biggest_struggle: string | null;
   reselling_experience: string | null;

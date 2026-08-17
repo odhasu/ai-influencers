@@ -27,7 +27,6 @@ import type { FunnelSettings } from "@/lib/funnel-settings";
 type AnswerKey =
   | "start_timeline"
   | "long_term_goal"
-  | "instagram"
   | "full_name"
   | "phone_number"
   | "biggest_struggle"
@@ -116,18 +115,6 @@ const steps: ReadonlyArray<FunnelStep> = [
     ]
   },
   {
-    key: "instagram",
-    title: "What is your Instagram?",
-    fields: [
-      {
-        id: "instagram",
-        type: "text",
-        placeholder: "@yourusername",
-        autocomplete: "off"
-      }
-    ]
-  },
-  {
     key: "biggest-struggle",
     title: "What has been your biggest struggle so far in achieving your goals?",
     fields: [
@@ -165,7 +152,6 @@ const steps: ReadonlyArray<FunnelStep> = [
 const initialAnswers: Answers = {
   start_timeline: "",
   long_term_goal: "",
-  instagram: "",
   full_name: "",
   phone_number: "",
   biggest_struggle: "",

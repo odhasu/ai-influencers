@@ -115,8 +115,8 @@ function percentage(value: number) {
   return `${Math.round(value * 10) / 10}%`;
 }
 
-function hasInstagramHandle(value: string) {
-  const trimmed = value.trim();
+function hasInstagramHandle(value: string | null): value is string {
+  const trimmed = value?.trim();
   return Boolean(trimmed && trimmed !== "not_provided");
 }
 
@@ -295,7 +295,7 @@ export function DashboardClient({
     ).size;
     const today = dayKey(new Date());
     const todayLeads = analyticsLeads.filter((lead) => lead.created_at.slice(0, 10) === today).length;
-    const highIntent = analyticsLeads.filter((lead) => ["$1K - $3K USD", "$3K+ USD"].includes(lead.budget_range)).length;
+    const highIntent = analyticsLeads.filter((lead) => lead.budget_range !== "Under $200 USD").length;
     const visitorEvents = analyticsEvents.filter((event) => event.event_name === "page_viewed");
     const uniqueVisitors = new Set(visitorEvents.map((event) => event.visitor_id || event.session_id)).size;
     const returningVisitors = new Set(
@@ -988,7 +988,7 @@ function LeadsTab({
         </div>
 
         <div className={styles.filters}>
-          <label className={styles.search}><Search size={17} /><input value={search} placeholder="Search name, phone, Instagram or source" onChange={(event) => onSearch(event.target.value)} /></label>
+          <label className={styles.search}><Search size={17} /><input value={search} placeholder="Search name, phone or source" onChange={(event) => onSearch(event.target.value)} /></label>
           <select aria-label="Received date" value={timeRange} onChange={(event) => onTimeRange(event.target.value as LeadTimeRange)}>
             <option value="all">Received: any time</option>
             <option value="today">Received: today</option>
@@ -1278,7 +1278,7 @@ function LeadDrawer({
           {hasInstagramHandle(lead.instagram) ? (
             <a href={`https://instagram.com/${lead.instagram.replace(/^@/, "")}`} target="_blank" rel="noreferrer"><AtSign size={16} /> Instagram</a>
           ) : (
-            <span className={styles.disabledContact}><AtSign size={16} /> Instagram skipped</span>
+            <span className={styles.disabledContact}><AtSign size={16} /> Instagram not collected</span>
           )}
         </div>
 

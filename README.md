@@ -32,8 +32,8 @@ The three public URLs above returned successfully during this review. The latest
 | --- | --- |
 | `/` | Public application funnel |
 | `/waitlist` | Public application funnel |
-| `/qualified` | Confirmation for the top two budget tiers |
-| `/not-qualified` | Confirmation for budget tiers below $1K |
+| `/qualified` | Confirmation for budget tiers of $200 or more |
+| `/not-qualified` | Confirmation for the budget tier below $200 |
 | `/waitlist-thank-you` | Legacy thank-you experience retained for future use |
 | `/dashboard` | Private lead, referral, analytics, and settings dashboard |
 | `/admin/login` | Dashboard authentication |
@@ -64,17 +64,16 @@ The renderer also recognizes the previous branded headline and previous `#39FF14
 
 ## Application flow
 
-The application asks seven steps:
+The application asks six steps:
 
 1. Full name
 2. How soon the applicant wants to start
 3. Long-term AI digital e-commerce income goal
 4. Phone number with an international country selector
-5. Instagram handle
-6. Biggest struggle so far
-7. Available budget
+5. Biggest struggle so far
+6. Available budget
 
-The income-goal and budget choices currently use USD. The current application does not collect email.
+The income-goal and budget choices currently use USD. The current application does not collect email or Instagram.
 
 Submission behavior:
 
@@ -84,8 +83,8 @@ Submission behavior:
 - Phone number is used to match and update repeat applications.
 - Existing first-touch attribution is preserved for repeat submissions.
 - Success is shown only after the server confirms storage.
-- `$1K - $3K USD` and `$3K+ USD` route to `/qualified`.
-- The three budget tiers below `$1K` route to `/not-qualified`.
+- `Under $200 USD` routes to `/not-qualified`.
+- Every budget tier from `$200 - $500 USD` upward routes to `/qualified`.
 - Optional lead webhooks run independently and cannot invalidate a stored lead.
 
 ## Dashboard and data model

@@ -13,7 +13,6 @@ const answersSchema = z.object({
     "Part time money - $4K-$10K/month",
     "Full time money - $15K+/month"
   ]),
-  instagram: z.string().trim().min(2).max(100),
   full_name: z.string().trim().min(2).max(120),
   phone_number: z
     .string()
@@ -31,7 +30,9 @@ const answersSchema = z.object({
   ])
 });
 
-const qualifiedBudgets = new Set(["$1K - $3K USD", "$3K+ USD"]);
+function qualificationForBudget(budget: string) {
+  return budget === "Under $200 USD" ? "not-qualified" : "qualified";
+}
 
 const attributionTouchSchema = z.object({
   captured_at: z.union([z.literal(""), z.iso.datetime()]),
@@ -109,11 +110,6 @@ async function sendLeadWebhook(payload: Record<string, unknown>) {
   }
 }
 
-function normalizeInstagram(value: string) {
-  const trimmed = value.trim();
-  return trimmed && trimmed !== "not_provided" ? trimmed : "not_provided";
-}
-
 export async function POST(request: Request) {
   let parsed: z.infer<typeof requestSchema>;
 
@@ -130,14 +126,13 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       leadId: crypto.randomUUID(),
-      qualification: qualifiedBudgets.has(parsed.answers.budget_range) ? "qualified" : "not-qualified"
+      qualification: qualificationForBudget(parsed.answers.budget_range)
     });
   }
 
   const { answers, metadata } = parsed;
   const { attribution } = metadata;
   const { first_touch: firstTouch, last_touch: lastTouch } = attribution;
-  const instagram = normalizeInstagram(answers.instagram);
 
   try {
     const supabase = createSupabaseAdmin();
@@ -182,7 +177,6 @@ export async function POST(request: Request) {
     const leadPayload = {
       start_timeline: answers.start_timeline,
       long_term_goal: answers.long_term_goal,
-      instagram,
       full_name: answers.full_name,
       phone_number: answers.phone_number,
       biggest_struggle: answers.biggest_struggle,
@@ -244,7 +238,7 @@ export async function POST(request: Request) {
         event: "form_submit_succeeded",
         properties: {
           lead_id: data.id,
-          total_steps: 7,
+          total_steps: 6,
           elapsed_ms: metadata.form_duration_ms,
           utm_source: resolvedAttribution.utm_source,
           utm_medium: resolvedAttribution.utm_medium,
@@ -309,7 +303,7 @@ export async function POST(request: Request) {
           event: "waitlist_application_created",
           lead_id: data.id,
           created_at: new Date().toISOString(),
-          answers: { ...answers, instagram },
+          answers,
           attribution: {
             first_touch: preservedFirstTouch,
             last_touch: lastTouch,
@@ -325,7 +319,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       leadId: data.id,
-      qualification: qualifiedBudgets.has(answers.budget_range) ? "qualified" : "not-qualified"
+      qualification: qualificationForBudget(answers.budget_range)
     });
   } catch (error) {
     console.error("waitlist_request_failed", {

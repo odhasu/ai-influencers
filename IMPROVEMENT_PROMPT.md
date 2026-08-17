@@ -33,7 +33,7 @@ The public funnel uses:
 - A darker, subtly warm-tinted background treatment
 - The headline `See How Regular People Are Building $5K-$30K/Month AI Digital Ecom Businesses`
 - Gold as the default accent (`#F2C268`), including compatibility for the previous neon-green saved setting
-- A seven-step application form
+- A six-step application form without Instagram or email collection
 - Server-validated Supabase lead updates matched by international phone number
 - Budget-based post-submission routing to `/qualified` and `/not-qualified`
 - A result gallery and configurable public funnel settings
