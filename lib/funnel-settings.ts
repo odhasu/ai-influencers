@@ -26,7 +26,7 @@ export type FunnelSettings = {
 export const defaultFunnelSettings: FunnelSettings = {
   campaignName: "Inner Circle Waitlist",
   heroHeadline:
-    "See How Regular People Are Building $5K-$30K/Month High-Ticket Reselling Businesses",
+    "See How Regular People Are Building $5K-$30K/Month AI Digital Ecom Businesses",
   heroBody: "",
   waitlistHeading: "Apply Now",
   ctaLabel: "Get Started Now",

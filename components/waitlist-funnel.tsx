@@ -70,6 +70,8 @@ const calendlyUrl =
   "https://calendly.com/ogvendorss/htr-call?hide_event_type_details=1&hide_gdpr_banner=1&background_color=ffffff&text_color=111111&primary_color=000000";
 
 const brandedHeroHeadline =
+  "See How Regular People Are Building $5K-$30K/Month AI Digital Ecom Businesses";
+const previousBrandedHeroHeadline =
   "See How Regular People Are Building $5K-$30K/Month High-Ticket Reselling Businesses";
 
 const steps: ReadonlyArray<FunnelStep> = [
@@ -263,6 +265,8 @@ function validStep(stepIndex: number, answers: Answers) {
 
 export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
   const accentColor = settings.accentColor.toLowerCase() === "#39ff14" ? "#f2c268" : settings.accentColor;
+  const isBrandedHero =
+    settings.heroHeadline === brandedHeroHeadline || settings.heroHeadline === previousBrandedHeroHeadline;
   const [answers, setAnswers] = useState<Answers>(initialAnswers);
   const [currentStep, setCurrentStep] = useState(0);
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
@@ -625,9 +629,9 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
         <section className="hero" aria-labelledby="hero-title">
           <h1
             id="hero-title"
-            className={`main-title${settings.heroHeadline === brandedHeroHeadline ? " branded-main-title" : ""}`}
+            className={`main-title${isBrandedHero ? " branded-main-title" : ""}`}
           >
-            {settings.heroHeadline === brandedHeroHeadline ? (
+            {isBrandedHero ? (
               <>
                 <span className="hero-title-line hero-title-lead">
                   See How Regular<span className="mobile-title-break"><br /></span> People Are
@@ -636,8 +640,7 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
                   Building<span className="mobile-title-break"><br /></span> $5K-$30K/Month
                 </span>
                 <span className="hero-title-line hero-title-close">
-                  High-Ticket<span className="mobile-title-break"><br /></span> Reselling
-                  <span className="mobile-title-break"><br /></span> Businesses
+                  AI Digital<span className="mobile-title-break"><br /></span> Ecom Businesses
                 </span>
               </>
             ) : (
