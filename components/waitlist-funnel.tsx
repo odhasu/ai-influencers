@@ -191,21 +191,21 @@ const localWinImages = [
     width: 926,
     height: 850,
     alt: "Inner Circle member showing Supreme product inventory",
-    timestampMask: { left: "15.1%", top: "2.7%", width: "39.2%", height: "6.35%", backgroundColor: "#08080a" }
+    timestampMask: { left: "29.35%", top: "22%", width: "23.2%", height: "3.76%", backgroundColor: "#08080a" }
   },
   {
     src: "/wins/selling-7846-win.png",
     width: 744,
     height: 868,
     alt: "Inner Circle member showing 7,846 dollars in 90-day sales",
-    timestampMask: { left: "19.1%", top: "2.95%", width: "36.2%", height: "5.45%", backgroundColor: "#1b1b1d" }
+    timestampMask: { left: "26.75%", top: "14.6%", width: "27.25%", height: "4.1%", backgroundColor: "#1b1b1d" }
   },
   {
     src: "/wins/cash-win.png",
     width: 768,
     height: 758,
     alt: "Inner Circle member showing cash from reselling",
-    timestampMask: { left: "19.6%", top: "0%", width: "39.9%", height: "6.2%", backgroundColor: "#1a1b1f" }
+    timestampMask: { left: "30.65%", top: "18.2%", width: "25.4%", height: "3.95%", backgroundColor: "#1a1b1f" }
   }
 ] as const;
 
