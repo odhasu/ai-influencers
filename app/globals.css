@@ -1078,6 +1078,7 @@ main {
   color: #d4d4d4;
   font-size: clamp(17px, 2.5vw, 20px);
   line-height: 1.6;
+  white-space: pre-line;
 }
 
 .thank-you-hero {
