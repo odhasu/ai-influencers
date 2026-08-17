@@ -191,21 +191,21 @@ const localWinImages = [
     width: 926,
     height: 850,
     alt: "Inner Circle member showing Supreme product inventory",
-    timestampMask: { left: "29.35%", top: "2.7%", width: "23.2%", height: "6.35%", backgroundColor: "#08080a" }
+    timestampMask: { left: "15.1%", top: "2.7%", width: "39.2%", height: "6.35%", backgroundColor: "#08080a" }
   },
   {
     src: "/wins/selling-7846-win.png",
     width: 744,
     height: 868,
     alt: "Inner Circle member showing 7,846 dollars in 90-day sales",
-    timestampMask: { left: "26.75%", top: "2.95%", width: "27.25%", height: "5.45%", backgroundColor: "#1b1b1d" }
+    timestampMask: { left: "19.1%", top: "2.95%", width: "36.2%", height: "5.45%", backgroundColor: "#1b1b1d" }
   },
   {
     src: "/wins/cash-win.png",
     width: 768,
     height: 758,
     alt: "Inner Circle member showing cash from reselling",
-    timestampMask: { left: "30.65%", top: "0%", width: "25.4%", height: "6.2%", backgroundColor: "#1a1b1f" }
+    timestampMask: { left: "19.6%", top: "0%", width: "39.9%", height: "6.2%", backgroundColor: "#1a1b1f" }
   }
 ] as const;
 
@@ -228,7 +228,7 @@ function ResultsCarouselSet({ duplicate = false }: { duplicate?: boolean }) {
           className={`win-image${win.kind === "local" ? " win-image-local" : ""}`}
           key={win.kind === "local" ? win.src : `${win.id}-${index}`}
         >
-          <span className="win-image-frame" style={{ aspectRatio: `${win.width} / ${win.height}` }}>
+          <span className="win-image-frame">
             {win.kind === "local" ? (
               <>
                 <Image

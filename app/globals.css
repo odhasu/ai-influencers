@@ -994,7 +994,6 @@ main {
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 18px;
-  background: #030303;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.34);
 }
 
@@ -1002,6 +1001,7 @@ main {
   position: relative;
   display: block;
   width: 100%;
+  height: 100%;
 }
 
 .win-time-mask {
@@ -1027,13 +1027,16 @@ main {
 .win-image picture,
 .win-image-frame {
   display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .win-image img {
   display: block;
   width: 100%;
-  height: auto;
-  background: #030303;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
 }
 
 @keyframes wins-scroll {
