@@ -209,6 +209,72 @@ const localWinImages = [
   }
 ] as const;
 
+const carouselWinImages = [
+  ...localWinImages.map((win) => ({ ...win, kind: "local" as const })),
+  ...winImages.map(([id, width, height], index) => ({
+    kind: "remote" as const,
+    id,
+    width,
+    height,
+    alt: `Inner Circle result ${index + 1}`
+  }))
+];
+
+function ResultsCarouselSet({ duplicate = false }: { duplicate?: boolean }) {
+  return (
+    <div className="wins-carousel-set" aria-hidden={duplicate || undefined}>
+      {carouselWinImages.map((win, index) => (
+        <span
+          className={`win-image${win.kind === "local" ? " win-image-local" : ""}`}
+          key={win.kind === "local" ? win.src : `${win.id}-${index}`}
+        >
+          <span className="win-image-frame" style={{ aspectRatio: `${win.width} / ${win.height}` }}>
+            {win.kind === "local" ? (
+              <>
+                <Image
+                  src={win.src}
+                  width={win.width}
+                  height={win.height}
+                  alt={win.alt}
+                  sizes="(max-width: 640px) 68vw, (max-width: 1100px) 30vw, 300px"
+                  quality={90}
+                />
+                <span className="win-time-mask" style={win.timestampMask} aria-hidden="true" />
+              </>
+            ) : (
+              <picture>
+                <source
+                  type="image/avif"
+                  srcSet={[320, 640, 960, 1280, 1920]
+                    .map((size) => `https://cdn.clyro.io/images/variants/${win.id}/${size}.avif ${size}w`)
+                    .join(", ")}
+                  sizes="(max-width: 640px) 68vw, (max-width: 1100px) 30vw, 300px"
+                />
+                <source
+                  type="image/webp"
+                  srcSet={[320, 640, 960, 1280, 1920]
+                    .map((size) => `https://cdn.clyro.io/images/variants/${win.id}/${size}.webp ${size}w`)
+                    .join(", ")}
+                  sizes="(max-width: 640px) 68vw, (max-width: 1100px) 30vw, 300px"
+                />
+                <img
+                  src={`https://cdn.clyro.io/images/variants/${win.id}/640.webp`}
+                  width={win.width}
+                  height={win.height}
+                  alt={win.alt}
+                  loading="lazy"
+                  decoding="async"
+                  fetchPriority="low"
+                />
+              </picture>
+            )}
+          </span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function validStep(stepIndex: number, answers: Answers) {
   return steps[stepIndex].fields.every((field) => {
     const value = answers[field.id].trim();
@@ -701,55 +767,11 @@ export function WaitlistFunnel({ settings }: { settings: FunnelSettings }) {
             aria-labelledby="wins-title"
           >
             <h2 id="wins-title">Student Results</h2>
-            <div className="wins-masonry">
-              {localWinImages.map((win) => (
-                <span
-                  className="win-image win-image-local"
-                  key={win.src}
-                >
-                  <Image
-                    src={win.src}
-                    width={win.width}
-                    height={win.height}
-                    alt={win.alt}
-                    sizes="(max-width: 768px) 50vw, 25vw"
-                    quality={90}
-                  />
-                  <span className="win-time-mask" style={win.timestampMask} aria-hidden="true" />
-                </span>
-              ))}
-              {winImages.map(([id, width, height], index) => (
-                <span
-                  className="win-image"
-                  key={`${id}-${index}`}
-                >
-                  <picture>
-                    <source
-                      type="image/avif"
-                      srcSet={[320, 640, 960, 1280, 1920]
-                        .map((size) => `https://cdn.clyro.io/images/variants/${id}/${size}.avif ${size}w`)
-                        .join(", ")}
-                      sizes="(max-width: 768px) 50vw, 25vw"
-                    />
-                    <source
-                      type="image/webp"
-                      srcSet={[320, 640, 960, 1280, 1920]
-                        .map((size) => `https://cdn.clyro.io/images/variants/${id}/${size}.webp ${size}w`)
-                        .join(", ")}
-                      sizes="(max-width: 768px) 50vw, 25vw"
-                    />
-                    <img
-                      src={`https://cdn.clyro.io/images/variants/${id}/640.webp`}
-                      width={width}
-                      height={height}
-                      alt={`Inner Circle result ${index + 1}`}
-                      loading="lazy"
-                      decoding="async"
-                      fetchPriority="low"
-                    />
-                  </picture>
-                </span>
-              ))}
+            <div className="wins-carousel" aria-label="Scrolling student results">
+              <div className="wins-carousel-track">
+                <ResultsCarouselSet />
+                <ResultsCarouselSet duplicate />
+              </div>
             </div>
           </section>
         ) : null}

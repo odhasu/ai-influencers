@@ -950,7 +950,7 @@ main {
 }
 
 .wins {
-  padding: clamp(32px, 20px + 2.2vw, 64px) clamp(0.85rem, 4vw, 1.5rem);
+  padding: clamp(32px, 20px + 2.2vw, 64px) 0;
 }
 
 .wins h2 {
@@ -961,20 +961,47 @@ main {
   font-size: clamp(24px, 17px + 2vw, 48px);
 }
 
-.wins-masonry {
-  max-width: 1168px;
-  margin: 0 auto;
-  column-count: 4;
-  column-gap: 16px;
+.wins-carousel {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  padding: 4px 0 20px;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+}
+
+.wins-carousel-track {
+  display: flex;
+  width: max-content;
+  animation: wins-scroll 105s linear infinite;
+  will-change: transform;
+}
+
+.wins-carousel-set {
+  display: flex;
+  flex: none;
+  gap: clamp(12px, 1.5vw, 20px);
+  padding-right: clamp(12px, 1.5vw, 20px);
 }
 
 .win-image {
   position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: clamp(220px, 23vw, 300px);
+  aspect-ratio: 0.645;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 18px;
+  background: #030303;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.34);
+}
+
+.win-image-frame {
+  position: relative;
   display: block;
   width: 100%;
-  margin: 0 0 16px;
-  break-inside: avoid;
-  overflow: visible;
 }
 
 .win-time-mask {
@@ -997,7 +1024,8 @@ main {
   color: #1a1b1f;
 }
 
-.win-image picture {
+.win-image picture,
+.win-image-frame {
   display: block;
 }
 
@@ -1005,16 +1033,13 @@ main {
   display: block;
   width: 100%;
   height: auto;
-  border: 1px solid rgba(242, 194, 104, 0.2);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.02);
-  box-shadow: 0 8px 24px rgba(242, 194, 104, 0.12);
-  transition: border-color 300ms ease, box-shadow 300ms ease;
+  background: #030303;
 }
 
-.win-image:hover img {
-  border-color: rgba(242, 194, 104, 0.5);
-  box-shadow: 0 0 24px rgba(242, 194, 104, 0.3);
+@keyframes wins-scroll {
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
 }
 
 .final-cta {
@@ -1337,14 +1362,14 @@ input:focus-visible {
   color: #211607;
 }
 
-.reveal-target .win-image,
+.reveal-target .wins-carousel,
 .reveal-target .cta-button,
 .reveal-target > h2 {
   opacity: 0;
   transform: translate3d(0, 30px, 0);
 }
 
-.wins.reveal-target .win-image {
+.wins.reveal-target .wins-carousel {
   transform: translate3d(-34px, 0, 0) scale(0.985);
 }
 
@@ -1361,7 +1386,7 @@ input:focus-visible {
   animation-name: text-slide-fade-horizontal;
 }
 
-.reveal-target.is-visible .win-image {
+.reveal-target.is-visible .wins-carousel {
   animation: win-image-reveal 1.08s cubic-bezier(0.16, 1, 0.3, 1) 140ms both;
   will-change: opacity, transform;
 }
@@ -1427,10 +1452,10 @@ input:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .reveal-target .win-image,
+  .reveal-target .wins-carousel,
   .reveal-target .cta-button,
   .reveal-target > h2,
-  .reveal-target.is-visible .win-image,
+  .reveal-target.is-visible .wins-carousel,
   .reveal-target.is-visible .cta-button,
   .reveal-target.is-visible > h2 {
     opacity: 1;
@@ -1457,8 +1482,9 @@ input:focus-visible {
 }
 
 @media (max-width: 768px) {
-  .wins-masonry {
-    column-count: 2;
+  .wins-carousel {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+    mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
   }
 }
 
@@ -1583,7 +1609,7 @@ input:focus-visible {
   }
 
   .wins {
-    padding: 36px 12px;
+    padding: 36px 0;
   }
 
   .wins h2 {
@@ -1591,12 +1617,9 @@ input:focus-visible {
     font-size: clamp(26px, 8vw, 34px);
   }
 
-  .wins-masonry {
-    column-gap: 10px;
-  }
-
   .win-image {
-    margin-bottom: 10px;
+    width: min(68vw, 260px);
+    border-radius: 14px;
   }
 
   .cta-button {

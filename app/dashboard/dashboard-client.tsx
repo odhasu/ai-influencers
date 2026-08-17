@@ -1358,7 +1358,7 @@ function SettingsTab({
           <div className={styles.settingsHeading}><div className={styles.settingsIcon}><MousePointerClick size={18} /></div><div><h2>Form behavior</h2><p>Control availability, pacing, and proof sections.</p></div></div>
           <div className={styles.switchList}>
             <SwitchRow title="Accept applications" description="Turn off to pause the form without taking the page down." checked={settings.formEnabled} onChange={(value) => set("formEnabled", value)} />
-            <SwitchRow title="Show proof gallery" description="Display the Inner Circle wins masonry gallery." checked={settings.showWins} onChange={(value) => set("showWins", value)} />
+            <SwitchRow title="Show proof gallery" description="Display the scrolling student results gallery." checked={settings.showWins} onChange={(value) => set("showWins", value)} />
           </div>
           <div className={styles.settingsGridCompact}><label>Auto-advance delay (ms)<input type="number" min={0} max={2000} value={settings.autoAdvanceDelayMs} onChange={(event) => set("autoAdvanceDelayMs", Number(event.target.value))} /></label></div>
         </section>
