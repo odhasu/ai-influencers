@@ -1,18 +1,61 @@
 # Analytics Contract
 
-The funnel uses consented, first-party events stored in Supabase and mirrors the same behavioral events to PostHog when configured.
+Last reviewed: **August 17, 2026**
 
-## Identity and attribution
+The application contains a consent-gated, first-party analytics pipeline backed by Supabase and can mirror the same allowed events to PostHog when configured.
 
-- A random visitor ID is stored after analytics consent. It is not a browser fingerprint.
+## Current operational status
+
+The event schemas, storage, attribution, PostHog integration, and conversion endpoint are implemented. However, `components/analytics-consent.tsx` is not currently mounted in `app/layout.tsx`.
+
+Consequences for new visitors:
+
+- Behavioral event capture remains off because no consent decision can be made through the current UI.
+- PostHog initializes in opt-out mode and does not capture events.
+- Lead submission still works and sends `analytics_consent: false`.
+- Non-consented submissions use an ephemeral session ID and omit persistent visitor, pageview, first-touch, last-touch, and PostHog identity values.
+
+Visitors with a previously stored `analytics_consent=granted` decision can still emit the events below. Do not call the analytics pipeline fully active until the consent component is mounted and tested.
+
+## Consent and identity
+
+After consent:
+
+- A random visitor UUID is stored in local storage. It is not a browser fingerprint.
 - Sessions expire after 30 minutes of inactivity and retain a session sequence number.
-- First touch and last non-direct touch are stored side by side.
-- Allowed acquisition parameters: `ref`, standard UTMs, `gclid`, `gbraid`, `wbraid`, `fbclid`, `ttclid`, `msclkid`, `twclid`, `li_fat_id`, `sccid`, and `dclid`.
-- Referrer hostname and path are stored without query parameters.
-- Browser, OS, device class, country, region, city, timezone, locale, and viewport dimensions are captured without storing raw IP addresses.
-- On submission, the consented visitor ID is linked to the internal lead ID. Repeat submissions from another consented browser can link multiple visitor IDs to the same lead.
+- A new pageview UUID is generated per page load.
+- The client sends timezone, locale, and viewport dimensions.
+- Supabase stores first touch and last non-direct touch side by side.
+- The server can add Vercel country, region, and city headers without storing raw IP addresses.
+- On submission, visitor identity is linked to the internal lead ID in `lead_visitor_links`.
+- Repeat submissions from another consented browser may link multiple visitor IDs to one lead.
 
-## Funnel events
+Declining consent removes the stored visitor, session, and attribution state and opts PostHog out.
+
+## Attribution allowlist
+
+Stored acquisition parameters are limited to:
+
+- `ref`
+- `utm_source`
+- `utm_medium`
+- `utm_campaign`
+- `utm_content`
+- `utm_term`
+- `gclid`
+- `gbraid`
+- `wbraid`
+- `fbclid`
+- `ttclid`
+- `msclkid`
+- `twclid`
+- `li_fat_id`
+- `sccid`
+- `dclid`
+
+Referrer hostname and path may be stored, but query parameters are removed. Arbitrary URL parameters are not accepted into attribution or analytics metadata.
+
+## Event contract
 
 Acquisition and engagement:
 
@@ -24,8 +67,6 @@ Acquisition and engagement:
 - `time_on_page_reached`
 - `button_clicked`
 - `primary_cta_clicked`
-
-PostHog also receives its standard `$pageview` event when `page_viewed` is captured. This keeps PostHog's built-in landing-page, geography, browser, device, and session reports compatible without enabling DOM autocapture.
 
 Application:
 
@@ -43,28 +84,101 @@ Application:
 - `form_submit_failed`
 - `form_success_shown`
 
-VSL and revenue:
+Media:
 
+- `testimonial_video_opened`
 - `vsl_started`
 - `vsl_played`
 - `vsl_paused`
 - `vsl_watch_batch`
 - `vsl_progress_reached`
 - `vsl_completed`
+
+Booking and revenue:
+
 - `booking_started`
 - `booking_completed`
 - `checkout_started`
 - `payment_succeeded`
 - `conversion_recorded`
 
-Watched seconds are batched in groups of up to 30, preserving exact second-level retention while avoiding one network request per second.
+The `/api/funnel-events` route rejects unknown event names and properties. Invalid, cross-origin, or storage-failed behavioral events intentionally return a non-blocking response so analytics can never interrupt the funnel.
+
+Watched seconds are batched in arrays of at most 30 values, preserving second-level retention without one request per watched second.
+
+## PostHog behavior
+
+PostHog runs only on public routes when both `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` and `NEXT_PUBLIC_POSTHOG_HOST` are configured.
+
+- Client requests use the same-origin `/ingest` proxy configured in `next.config.ts`.
+- Autocapture is disabled.
+- Automatic pageview capture is disabled.
+- `page_viewed` also emits PostHog’s standard `$pageview` event.
+- Dashboard and admin routes do not initialize PostHog.
+- Person profiles are created only after identification.
+- Session replay masks all inputs and masks text inside `[data-private]` containers.
+- Server events use the same project token and host through `posthog-node`.
+
+The following variables are reserved for PostHog project administration but are not required for basic event capture: `POSTHOG_PROJECT_ID`, `POSTHOG_API_HOST`, and `POSTHOG_PERSONAL_API_KEY`.
+
+## Lead submission events
+
+The browser emits `form_submit_started` before calling `/api/waitlist`. After a successful Supabase upsert:
+
+- The server always stores a first-party `form_submit_succeeded` operational event.
+- The server mirrors that event to PostHog only when the lead granted analytics consent.
+- The browser emits `form_success_shown` when the success and Calendly state is rendered.
+
+Lead contact details and form answer values never belong in these event properties.
 
 ## Conversion ingestion
 
-`POST /api/conversions` accepts authenticated server events for booking, checkout, payment, and final conversion. Callers send `Authorization: Bearer <ANALYTICS_INGEST_SECRET>`, an internal `lead_id`, an idempotent `external_id`, and optional value/currency fields.
+`POST /api/conversions` accepts authenticated server events for booking, checkout, payment, and final conversion.
 
-The endpoint updates pipeline status for bookings and wins, stores the conversion once, and mirrors it to PostHog only when the lead granted analytics consent.
+Required request elements:
+
+- `Authorization: Bearer <ANALYTICS_INGEST_SECRET>`
+- Internal `lead_id`
+- Idempotent provider `external_id`
+- Event name: `booking_completed`, `checkout_started`, `payment_succeeded`, or `conversion_recorded`
+
+Optional fields include occurrence time, value in cents, three-letter currency, provider, and product ID.
+
+Behavior:
+
+- A duplicate event/external-ID pair returns success with `duplicate: true`.
+- Bookings advance the lead to `booked` unless already `won`.
+- Payments and final conversions advance the lead to `won`.
+- PostHog receives the conversion only when the lead granted analytics consent.
+- The endpoint returns `503` when `ANALYTICS_INGEST_SECRET` is absent.
 
 ## Privacy boundary
 
-Never send names, emails, phone numbers, social handles, free-text answers, answer values, or complete URLs to analytics. PostHog autocapture is disabled, replay inputs are masked, and the event API strips unknown properties.
+Never send any of the following to first-party behavioral analytics or PostHog:
+
+- Names
+- Email addresses
+- Phone numbers
+- Social handles
+- Form answer values
+- Free-text notes or answers
+- Full URLs or arbitrary query strings
+- Credentials, tokens, or webhook payload secrets
+- Raw IP addresses
+
+The application database necessarily stores lead contact and application data for operating the funnel. That operational data is separate from the analytics event contract and remains accessible only through server-side Supabase access and the authenticated dashboard.
+
+## Verification checklist
+
+Before declaring analytics active:
+
+- [ ] Mount `AnalyticsConsent` on public routes and confirm it is absent from dashboard/admin routes.
+- [ ] Confirm decline removes local visitor, session, and attribution state.
+- [ ] Confirm allow creates pseudonymous IDs and emits `analytics_consent_granted`.
+- [ ] Confirm `/api/funnel-events` stores allowlisted properties only.
+- [ ] Confirm PostHog receives the same allowed events and standard `$pageview`.
+- [ ] Inspect requests to ensure no contact details or answers appear.
+- [ ] Confirm inputs and `[data-private]` text are masked in session replay.
+- [ ] Confirm repeat conversion `external_id` values are idempotent.
+- [ ] Confirm dashboard and admin routes generate no PostHog traffic.
+- [ ] Confirm analytics failures do not block application submission.

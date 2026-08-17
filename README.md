@@ -1,19 +1,29 @@
 # Authentic Resell Application Funnel
 
-Production application funnel for Authentic Resell. The project includes a public multi-step application, Supabase lead storage, referral tracking, a private lead dashboard, and an embedded Calendly booking flow.
+Production Next.js application for Authentic Resell. It combines a public multi-step application, Supabase lead storage, referral and attribution tracking, a private lead dashboard, and an inline Calendly booking handoff.
 
-Last progress update: **July 16, 2026**
+Last reviewed: **August 17, 2026**
 
 ## Live project
 
-- Production domain: [authenticresell.com](https://authenticresell.com)
+- Production: [authenticresell.com](https://authenticresell.com)
+- Dashboard: [dashboard.authenticresell.com](https://dashboard.authenticresell.com)
 - Vercel fallback: [authentic-resell-application.vercel.app](https://authentic-resell-application.vercel.app)
-- Private GitHub repository: [odhasu/authentic-resell-application](https://github.com/odhasu/authentic-resell-application)
+- GitHub: [odhasu/authentic-resell-application](https://github.com/odhasu/authentic-resell-application)
 - Vercel project: `authentic-resell-application`
-- Supabase: connected to the existing lead database
 - Production branch: `main`
 
-The apex custom domain is live on the new Vercel project. The `www` hostname is reserved in Vercel but still needs its DNS record configured at the domain registrar before it will resolve publicly. The old GitHub Pages website is no longer the intended production target.
+The three public URLs above returned successfully during this review. The latest local feature-branch checkpoint still requires the normal preview and production promotion process before it can be assumed live.
+
+## Technology
+
+- Next.js 16 App Router, React 19, and TypeScript
+- Supabase Postgres with server-only access and versioned migrations
+- Zod request validation
+- PostHog client/server SDKs when configured
+- Calendly inline scheduling and signed booking webhooks
+- Nodemailer with a Gmail App Password for booking notifications
+- Vercel hosting and request metadata
 
 ## Current routes
 
@@ -21,31 +31,34 @@ The apex custom domain is live on the new Vercel project. The `www` hostname is 
 | --- | --- |
 | `/` | Public application funnel |
 | `/waitlist` | Public application funnel |
-| `/dashboard` | Private lead and referral dashboard |
-| `/admin/login` | Dashboard login |
-| `/waitlist-thank-you` | Legacy thank-you page kept for possible future use |
-| `/api/waitlist` | Validated lead-submission endpoint |
-| `/api/funnel-events` | Funnel and referral event endpoint |
-| `/api/webhooks/calendly` | Signed Calendly booking webhook and owner Gmail notification |
+| `/waitlist-thank-you` | Legacy thank-you experience retained for future use |
+| `/dashboard` | Private lead, referral, analytics, and settings dashboard |
+| `/admin/login` | Dashboard authentication |
+| `/api/waitlist` | Validated lead upsert and operational follow-up tasks |
+| `/api/funnel-events` | Consented first-party behavioral event ingestion |
+| `/api/conversions` | Authenticated booking, checkout, payment, and conversion ingestion |
+| `/api/webhooks/calendly` | Signed Calendly booking webhook and Gmail notification |
 | `/api/admin/*` | Authenticated dashboard APIs |
 
-## Current public experience
+The proxy rewrites the root of `dashboard.authenticresell.com` to `/dashboard`; unauthenticated requests are redirected to `/admin/login`.
 
-The hero follows the visual direction from Authentic Resell:
+## Public experience
 
-- Clean alternating white and neon-green headline lines
-- Neon-green `Building $5K-$30K/Month` emphasis
-- White `High-Ticket Reselling Businesses` closing line
-- Subtle green underline beneath the headline
-- Separate responsive line breaks for laptop and phone layouts
+The current design retains the original Authentic Resell structure and animations:
+
+- White lead and closing headline lines
+- Gold `Building $5K-$30K/Month` emphasis
+- Gold accent color `#F2C268` instead of neon green
+- Darker animated curtain background with a subtle warm tint
+- Responsive headline breaks for desktop and mobile
 - Application heading: `Apply Now`
-- Brighter cinematic panel background with more visible texture, dividers, and depth
+- Current branded headline: `See How Regular People Are Building $5K-$30K/Month AI Digital Ecom Businesses`
 
-The redundant `Get Started Now` button beneath the form has been removed.
+The renderer also recognizes the previous branded headline and previous `#39FF14` setting so an older Supabase settings row still displays the current copy and gold accent. Other custom admin-entered headline or accent values remain configurable.
 
 ## Application flow
 
-The application currently asks seven steps:
+The application asks seven steps:
 
 1. Reselling experience
 2. Long-term reselling goal
@@ -55,100 +68,129 @@ The application currently asks seven steps:
 6. Available budget
 7. Confirmation that the applicant can commit to the booked call
 
-The Instagram username question has been removed. The backend stores `not_provided` for Instagram so existing database and dashboard fields remain compatible.
+The former Instagram question is not shown. The server stores `not_provided` to remain compatible with the existing database and dashboard field.
 
-After a successful submission:
+Submission behavior:
 
-- The visitor stays inside the same application card.
-- The page does not redirect to the legacy thank-you page.
-- Calendly opens inline using `https://calendly.com/ogvendorss/htr-call`.
-- Calendly uses a white surface, dark text, and black primary text so all booking fields and time slots remain readable.
+- The browser validates each step before advancing.
+- The final request is validated again with Zod on the server.
+- A honeypot absorbs basic bot submissions.
+- Email is normalized and used as the Supabase upsert key.
+- Existing first-touch attribution is preserved for repeat submissions.
+- Success is shown only after the server confirms storage.
+- Calendly opens inline in the application card after success.
+- Optional lead webhooks run independently and cannot invalidate a stored lead.
 
-## Dashboard and backend
+The active Calendly URL is currently set in `components/waitlist-funnel.tsx` to `https://calendly.com/ogvendorss/htr-call`.
 
-Supabase stores application data, funnel events, referral links, and funnel settings.
+## Dashboard and data model
+
+Supabase stores:
+
+- `waitlist_applications` — lead identity, application data, pipeline state, and attribution
+- `lead_activities` — status, note, follow-up, and tag history
+- `referral_links` — managed referral and UTM destinations
+- `funnel_settings` — server-managed public funnel settings
+- `funnel_events` — pseudonymous behavioral and conversion events
+- `lead_visitor_links` — consented visitor-to-lead relationships
+- `booking_email_notifications` — Calendly webhook idempotency and Gmail delivery state
+
+All protected tables are server-only. Browser roles have no direct access to lead data.
 
 The dashboard supports:
 
-- Separate Overview, Leads, Analytics, Referral links, and Settings navigation
-- New-versus-handled lead inboxes, where handled includes every status after `new`
-- Searchable and filterable lead list
-- Received-date, custom-date, follow-up-time, exact-status, and sorting filters under Advanced
-- CSV lead export
+- Overview, Leads, Analytics, Referral links, and Settings navigation
+- New and handled lead inboxes
+- Search, status, date, follow-up, and sorting filters
+- CSV export
 - Statuses: new, contacted, qualified, booked, won, and lost
-- Lead notes, tags, assigned owner, and follow-up date
-- Saved email and phone contact information
-- Safe handling of missing Instagram usernames
-- Referral links for Instagram, TikTok, YouTube, communities, and custom placements
-- Editable referral codes, destinations, and UTM values
-- Views, starts, leads, booked calls, wins, losses, and closed-lead metrics
-- Dedicated Analytics reporting with preset, all-time, and custom date ranges
-- Public funnel copy and behavior settings
-- Optional server-side lead webhook
+- Notes, tags, assigned owner, and follow-up scheduling
+- Referral links with editable destinations and UTM values
+- Views, starts, leads, bookings, wins, losses, and closed-lead metrics
+- Public funnel copy, accent, behavior, and optional webhook settings
 
-## Authentication and environment status
+## Authentication
 
-Configured in both Vercel Preview and Production:
+Dashboard login requires:
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-- `SUPABASE_SECRET_KEY`
 - `DASHBOARD_PASSWORD`
 - `DASHBOARD_SESSION_SECRET`
 
-Dashboard login uses a secure HTTP-only cookie. “Keep me signed in on this device” is enabled by default for a 30-day remembered session; clearing the checkbox creates a browser-session login that expires after 12 hours.
+Authentication uses a signed HTTP-only cookie. “Keep me signed in” creates a 30-day session; a non-remembered login expires after 12 hours or when the browser session ends.
 
-The dashboard password is stored only as an encrypted Vercel environment variable and must never be written into this repository or documentation.
+Never write the dashboard password, session secret, Supabase secret key, webhook signing key, analytics ingest secret, or Gmail App Password into source control or documentation.
 
-Not currently configured:
+## Environment variables
 
-- PostHog environment variables
-- `LEAD_WEBHOOK_URL`
-- Calendly/Gmail booking notification variables (see `.env.example`)
+Copy `.env.example` to `.env.local` and populate only the variables needed for local work. `.env.local` is ignored by Git.
 
-These are optional for the current funnel and do not block lead collection or the dashboard.
+Core application and dashboard:
 
-## Important implementation files
+| Variable | Purpose |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Reserved public project key; browser roles still have no protected table access |
+| `SUPABASE_SECRET_KEY` | Server-only database access |
+| `DASHBOARD_PASSWORD` | Private dashboard credential |
+| `DASHBOARD_SESSION_SECRET` | Cookie-signing secret |
 
-- `components/waitlist-funnel.tsx` — public form flow and Calendly state
-- `components/cinematic-curtain.tsx` — page background structure
-- `app/globals.css` — public funnel styling and brighter background
-- `app/api/waitlist/route.ts` — validation and Supabase lead writes
-- `app/dashboard/dashboard-client.tsx` — lead, referral, and settings interface
-- `lib/dashboard-data.ts` — dashboard database reads
-- `lib/funnel-settings.ts` — public funnel settings and defaults
-- `lib/admin-auth.ts` — dashboard session authentication
-- `lib/analytics/client.ts` — consented identity, attribution, and event collection
-- `ANALYTICS.md` — analytics event contract and privacy boundary
-- `supabase/migrations/` — versioned backend schema
+Optional integrations:
 
-## Removed from the funnel
+| Variable | Purpose |
+| --- | --- |
+| `LEAD_WEBHOOK_URL` | New-lead notification target enabled from dashboard settings |
+| `ANALYTICS_INGEST_SECRET` | Bearer secret for `/api/conversions` |
+| `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` | PostHog project token |
+| `NEXT_PUBLIC_POSTHOG_HOST` | PostHog ingest host; also enables the `/ingest` proxy |
+| `NEXT_PUBLIC_POSTHOG_UI_HOST` | PostHog project UI host |
+| `POSTHOG_PROJECT_ID` | Reserved for PostHog project administration |
+| `POSTHOG_API_HOST` | Reserved PostHog API host |
+| `POSTHOG_PERSONAL_API_KEY` | Reserved server-side PostHog administration credential |
+| `CALENDLY_WEBHOOK_SIGNING_KEY` | Calendly webhook verification |
+| `BOOKING_NOTIFICATION_TIMEZONE` | Booking email timezone; defaults to `Europe/Amsterdam` |
+| `GMAIL_USER` | Gmail sender account |
+| `GMAIL_APP_PASSWORD` | Gmail App Password |
+| `BOOKING_NOTIFICATION_EMAIL` | Optional recipient; defaults to `GMAIL_USER` |
 
-- Instagram application question
-- `Secure application` row and icon
-- Visible `Interviews with the Inner Circle` video section
-- Redirect to the new thank-you flow
-- Redundant CTA directly beneath the form
-- `The Inner Circle Is Currently Closed` messaging
+## Analytics status
+
+The consented first-party and PostHog event contract is documented in [ANALYTICS.md](./ANALYTICS.md).
+
+Important current limitation: `components/analytics-consent.tsx` exists but is not mounted in `app/layout.tsx`. New visitors therefore do not emit consent-gated behavioral analytics unless a prior `analytics_consent=granted` decision already exists in local storage. Lead submission continues to work without consent and stores no persistent visitor identity or marketing attribution.
+
+Do not describe analytics as fully active until the consent UI is mounted and verified.
+
+## Important files
+
+- `components/waitlist-funnel.tsx` — application flow, branded hero compatibility, analytics hooks, and Calendly state
+- `components/cinematic-curtain.tsx` — animated curtain structure
+- `app/globals.css` — public and thank-you styling
+- `app/api/waitlist/route.ts` — lead validation and Supabase upserts
+- `app/api/funnel-events/route.ts` — first-party analytics validation and storage
+- `app/api/conversions/route.ts` — authenticated conversion ingestion
+- `app/api/webhooks/calendly/route.ts` — signed webhook and booking email handling
+- `app/dashboard/dashboard-client.tsx` — dashboard interface
+- `lib/dashboard-data.ts` — dashboard queries and aggregates
+- `lib/funnel-settings.ts` — public settings types, defaults, and serialization
+- `lib/admin-auth.ts` — dashboard authentication
+- `lib/analytics/client.ts` — consent, session, attribution, and event collection
+- `instrumentation-client.ts` — PostHog initialization and masking
+- `supabase/migrations/` — authoritative database history
+- `IMPROVEMENT_PROMPT.md` — current maintenance brief and prioritized follow-up work
 
 ## Local development
 
 ```bash
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
-The app normally runs at:
+Open [http://localhost:3000](http://localhost:3000). Next.js may choose another port if `3000` is occupied.
 
-```text
-http://localhost:3000
-```
+Without Supabase variables, the public page uses default funnel settings, but lead submission and the protected dashboard require the configured backend.
 
-Another port such as `3001` may be used automatically if port `3000` is occupied.
-
-Local values belong in `.env.local`, which is ignored by Git. Never copy secret values into `.env.example`, Markdown files, source code, issues, or commits.
-
-## Verification checklist
+## Verification
 
 Run before pushing or deploying:
 
@@ -158,35 +200,34 @@ npm run typecheck
 npm run build
 ```
 
-Also verify:
+For public UI changes, also verify desktop and mobile behavior in a browser:
 
-- `/` and `/waitlist` load successfully
-- Form validation and navigation work
-- A valid application reaches Supabase
-- Calendly appears after submission
-- `/dashboard` requires authentication in production
-- Referral links preserve their source attribution
-- Desktop and mobile layouts do not overflow
+- `/` and `/waitlist` render without horizontal overflow.
+- The current hero copy and gold palette are visible.
+- Form validation, selection auto-advance, and back navigation work.
+- A valid application is acknowledged by Supabase before Calendly appears.
+- Browser console output has no unexplained errors.
 
-## Current progress
+For operational changes, verify:
 
-Completed:
+- `/dashboard` requires authentication.
+- Referral codes and allowlisted attribution survive submission.
+- Repeated conversion `external_id` values are idempotent.
+- Calendly rejects invalid signatures and ignores non-`invitee.created` events.
+- No PII appears in analytics event payloads.
 
-- Public funnel design and application flow
-- Supabase backend and lead storage
-- Lead management dashboard
-- Referral-link system and metrics
-- Calendly booking embed
-- Private GitHub repository
-- New Vercel project
-- Preview and Production Supabase variables
-- Preview and Production dashboard authentication
-- Custom apex-domain assignment
-- Brighter cinematic background
+## Deployment notes
 
-Optional next improvements:
+- Use a Vercel preview for end-to-end verification before production promotion.
+- Set secrets separately in Preview and Production; do not copy them into Git.
+- Apply new Supabase migrations before deploying code that depends on them.
+- Verify the apex, dashboard subdomain, and Vercel fallback after promotion.
+- The legacy static site in the parent directory is not the intended deployment source.
 
-- Add PostHog project variables and dashboards
-- Configure the Calendly booking webhook and Gmail App Password
-- Replace the current dashboard password with a stronger credential when desired
-- Add automated end-to-end form tests
+## Next priorities
+
+1. Mount and test the analytics consent component on public routes.
+2. Configure PostHog and create acquisition, completion, and conversion dashboards.
+3. Configure and verify the Calendly/Gmail booking notification path.
+4. Add automated end-to-end tests for form submission and dashboard authentication.
+5. Align page metadata with the AI Digital Ecom positioning when approved.
