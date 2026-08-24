@@ -5,6 +5,7 @@
   --dash-panel-2: #0c0f0d;
   --dash-line: #252a27;
   min-height: 100vh;
+  min-height: 100svh;
   display: grid;
   grid-template-columns: 244px minmax(0, 1fr);
   background: var(--dash-bg);
@@ -16,6 +17,7 @@
   position: sticky;
   top: 0;
   height: 100vh;
+  height: 100svh;
   display: flex;
   flex-direction: column;
   padding: 22px 14px;
@@ -1247,15 +1249,16 @@
 
 @media (max-width: 760px) {
   .app { display: block; }
-  .sidebar { position: sticky; z-index: 20; width: 100%; height: auto; display: block; padding: 10px 12px; border-right: 0; border-bottom: 1px solid var(--dash-line); }
+  .sidebar { position: sticky; z-index: 20; width: 100%; height: auto; display: block; padding: 10px max(12px, env(safe-area-inset-right)) 10px max(12px, env(safe-area-inset-left)); border-right: 0; border-bottom: 1px solid var(--dash-line); }
   .brand { padding: 0 0 10px; }
-  .nav { display: flex; overflow-x: auto; margin-top: 8px; }
+  .nav { display: flex; overflow-x: auto; margin-top: 8px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .nav::-webkit-scrollbar { display: none; }
   .nav button { width: auto; flex: 0 0 auto; }
   .sidebarFooter { display: none; }
-  .topbar { min-height: 72px; padding: 13px 16px; }
+  .topbar { min-height: 72px; padding: 13px max(16px, env(safe-area-inset-right)) 13px max(16px, env(safe-area-inset-left)); }
   .topbar h1 { font-size: 20px; }
   .notice { display: none; }
-  .content { padding: 16px; }
+  .content { padding: 16px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
   .homeIntro { padding: 18px; }
   .homeIntroActions { width: 100%; }
   .homeIntroActions button { flex: 1; }
