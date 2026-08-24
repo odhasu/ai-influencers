@@ -207,14 +207,18 @@ function ResultsCarouselSet({ duplicate = false }: { duplicate?: boolean }) {
   return (
     <div className="wins-carousel-set" aria-hidden={duplicate || undefined}>
       {carouselWinImages.map((win) => (
-        <span className="win-image" key={win.src}>
+        <span
+          className="win-image"
+          key={win.src}
+          style={{ "--win-ratio": `${win.width} / ${win.height}` } as CSSProperties}
+        >
           <span className="win-image-frame">
             <Image
               src={win.src}
               width={win.width}
               height={win.height}
               alt={win.alt}
-              sizes="(max-width: 640px) 68vw, (max-width: 1100px) 30vw, 300px"
+              sizes="(max-width: 640px) 70vw, (max-width: 1100px) 24vw, 320px"
               quality={90}
             />
           </span>
