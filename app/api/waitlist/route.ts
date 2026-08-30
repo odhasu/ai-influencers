@@ -32,7 +32,7 @@ const answersSchema = z.object({
 });
 
 function qualificationForBudget(budget: string) {
-  return budget === "Under $200 USD" ? "not-qualified" : "qualified";
+  return budget === "Under $200 USD" ? "unqualified" : "qualified";
 }
 
 const attributionTouchSchema = z.object({

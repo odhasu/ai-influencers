@@ -1,5 +1,6 @@
 import { Check } from "lucide-react";
 import { CinematicCurtain } from "@/components/cinematic-curtain";
+import { DiscordButton } from "@/components/discord-button";
 
 export function ApplicationResult({ message }: { message: string }) {
   return (
@@ -13,6 +14,9 @@ export function ApplicationResult({ message }: { message: string }) {
           <p className="application-result-kicker">Application status</p>
           <h1 id="application-result-title">Application Received</h1>
           <p className="application-result-message">{message}</p>
+          <div className="button-wrap discord-wrap">
+            <DiscordButton />
+          </div>
         </section>
       </main>
     </>

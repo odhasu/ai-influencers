@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: "Your Inner Circle application has been received."
 };
 
-export default function NotQualifiedPage() {
+export default function UnqualifiedPage() {
   return (
     <ApplicationResult message="Thank you for applying. Based on your current budget, we're unable to offer a strategy call at this time. We'll review your application and contact you if we're a good fit." />
   );
