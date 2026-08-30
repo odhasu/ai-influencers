@@ -1,5 +1,6 @@
 import { captureServerEvent } from "@/lib/posthog/server";
 import { getFunnelSettings } from "@/lib/funnel-settings";
+import { clientIp, hashIdentifier, rateLimit, RateLimitExceededError } from "@/lib/rate-limit";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -110,7 +111,24 @@ async function sendLeadWebhook(payload: Record<string, unknown>) {
   }
 }
 
+function rateLimitedResponse(error: RateLimitExceededError) {
+  return NextResponse.json(
+    { ok: false, message: "Too many applications. Please wait a few minutes and try again." },
+    { status: 429, headers: { "Retry-After": String(error.retryAfterSeconds) } }
+  );
+}
+
 export async function POST(request: Request) {
+  try {
+    rateLimit("waitlist:ip", hashIdentifier(clientIp(request)), {
+      limit: 10,
+      windowMs: 10 * 60 * 1000
+    });
+  } catch (error) {
+    if (error instanceof RateLimitExceededError) return rateLimitedResponse(error);
+    throw error;
+  }
+
   let parsed: z.infer<typeof requestSchema>;
 
   try {
@@ -128,6 +146,16 @@ export async function POST(request: Request) {
       leadId: crypto.randomUUID(),
       qualification: qualificationForBudget(parsed.answers.budget_range)
     });
+  }
+
+  try {
+    rateLimit("waitlist:phone", hashIdentifier(parsed.answers.phone_number), {
+      limit: 5,
+      windowMs: 24 * 60 * 60 * 1000
+    });
+  } catch (error) {
+    if (error instanceof RateLimitExceededError) return rateLimitedResponse(error);
+    throw error;
   }
 
   const { answers, metadata } = parsed;
