@@ -7,7 +7,7 @@ import { getFunnelSettings } from "@/lib/funnel-settings";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "You're on the Waitlist | Lucas Resells",
+  title: "You're on the Waitlist | OG Ecom",
   description: "Your Inner Circle waitlist application has been received."
 };
 
@@ -46,7 +46,7 @@ export default async function WaitlistThankYouPage() {
             You Just Applied to the Waitlist
           </h1>
           <p className="thank-you-copy">
-            Lucas is only letting a select few applicants join the program early. Be on the lookout for a phone call or text within the next couple of hours - if you don&apos;t respond, you&apos;ll miss your opportunity.
+            OG Ecom is only letting a select few applicants join the program early. Be on the lookout for a phone call or text within the next couple of hours - if you don&apos;t respond, you&apos;ll miss your opportunity.
           </p>
         </section>
 
